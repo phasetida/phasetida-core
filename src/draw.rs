@@ -1,5 +1,5 @@
 use crate::chart::{Note, NoteType};
-use crate::effect::{HitEffect, SoundEffect, SplashEffect};
+use crate::states_effect::{HitEffect, SoundEffect, SplashEffect};
 use crate::math::{self, Point};
 use crate::renders::{
     self, Dense, RendClickEffect, RendNote, RendPoint, RendSound, RendSplashEffect, RendStatistics,
@@ -20,20 +20,6 @@ pub struct DrawImageOffset {
 pub trait BufferWithCursor {
     fn write(&mut self, slice: &[u8]);
 }
-
-// struct BufferWithCursor<'a> {
-//     buffer: &'a js_sys::Uint8Array,
-//     cursor: usize,
-// }
-
-// impl<'a> BufferWithCursor<'a> {
-//     fn write(&mut self, slice: &[u8]) {
-//         slice.iter().for_each(|it| {
-//             self.buffer.set_index(self.cursor as u32, *it);
-//             self.cursor += 1;
-//         });
-//     }
-// }
 
 impl Default for DrawImageOffset {
     fn default() -> Self {

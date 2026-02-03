@@ -3,55 +3,65 @@ use std::collections::HashSet;
 use crate::{
     LINE_STATES,
     chart::{self, JudgeLine, WithTimeRange},
-    states::{LineState, Metadata, NoteState, get_seconds_per_tick},
+    states::{LineState, Metadata, NoteState, get_seconds_per_tick}, states_statistics,
 };
 
-pub fn init_line_states(chart: chart::Chart) -> Metadata {
-    LINE_STATES
-        .with_borrow_mut(|states| {
-            *states = std::array::from_fn(|_| std::default::Default::default());
-            let iter = chart.judge_line_list.into_iter().enumerate();
-            let available_len = iter.len();
-            iter.for_each(|(i, it)| {
-                let JudgeLine {
-                    bpm,
-                    notes_above,
-                    notes_below,
-                    speed_events,
-                    move_events,
-                    rotate_events,
-                    alpha_events,
-                } = it;
-                states[i] = LineState {
-                    enable: true,
-                    bpm,
-                    move_events,
-                    alpha_events,
-                    speed_events,
-                    rotate_events,
-                    notes_above_state: notes_above
-                        .clone()
-                        .into_iter()
-                        .map(|it| NoteState {
-                            note: it,
-                            ..std::default::Default::default()
-                        })
-                        .collect(),
-                    notes_below_state: notes_below
-                        .clone()
-                        .into_iter()
-                        .map(|it| NoteState {
-                            note: it,
-                            ..std::default::Default::default()
-                        })
-                        .collect(),
-                    ..Default::default()
-                }
-            });
-            (available_len..states.len()).for_each(|it| states[it].enable = false);
-            process_highlight(states.as_mut());
-            get_metadata(states)
+pub fn init_line_states(mut chart: chart::Chart) -> Metadata {
+    chart.judge_line_list = chart
+        .judge_line_list
+        .into_iter()
+        .map(|mut line| {
+            line.notes_above.sort_by(|a, b| (a.time).cmp(&b.time));
+            line.notes_below.sort_by(|a, b| (a.time).cmp(&b.time));
+            line
         })
+        .collect::<Vec<_>>();
+
+    LINE_STATES.with_borrow_mut(|states| {
+        *states = std::array::from_fn(|_| std::default::Default::default());
+        let iter = chart.judge_line_list.into_iter().enumerate();
+        let available_len = iter.len();
+        iter.for_each(|(i, it)| {
+            let JudgeLine {
+                bpm,
+                notes_above,
+                notes_below,
+                speed_events,
+                move_events,
+                rotate_events,
+                alpha_events,
+            } = it;
+            states[i] = LineState {
+                enable: true,
+                bpm,
+                move_events,
+                alpha_events,
+                speed_events,
+                rotate_events,
+                notes_above_state: notes_above
+                    .clone()
+                    .into_iter()
+                    .map(|it| NoteState {
+                        note: it,
+                        ..std::default::Default::default()
+                    })
+                    .collect(),
+                notes_below_state: notes_below
+                    .clone()
+                    .into_iter()
+                    .map(|it| NoteState {
+                        note: it,
+                        ..std::default::Default::default()
+                    })
+                    .collect(),
+                ..Default::default()
+            }
+        });
+        (available_len..states.len()).for_each(|it| states[it].enable = false);
+        process_highlight(states.as_mut());
+        states_statistics::init_flatten_line_state();
+        get_metadata(states)
+    })
 }
 
 fn process_highlight(judge_line_states: &mut [LineState]) {
