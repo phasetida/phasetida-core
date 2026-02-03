@@ -16,8 +16,7 @@ pub fn init_line_states(mut chart: chart::Chart) -> Metadata {
             line
         })
         .collect::<Vec<_>>();
-
-    LINE_STATES.with_borrow_mut(|states| {
+    let metadata=LINE_STATES.with_borrow_mut(|states| {
         *states = std::array::from_fn(|_| std::default::Default::default());
         let iter = chart.judge_line_list.into_iter().enumerate();
         let available_len = iter.len();
@@ -59,9 +58,10 @@ pub fn init_line_states(mut chart: chart::Chart) -> Metadata {
         });
         (available_len..states.len()).for_each(|it| states[it].enable = false);
         process_highlight(states.as_mut());
-        states_statistics::init_flatten_line_state();
         get_metadata(states)
-    })
+    });
+    states_statistics::init_flatten_line_state();
+    metadata
 }
 
 fn process_highlight(judge_line_states: &mut [LineState]) {
