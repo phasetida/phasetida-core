@@ -23,6 +23,7 @@ thread_local! {
     pub static SOUND_POOL: RefCell<states_effect::SoundEffect> = RefCell::new(std::default::Default::default());
 }
 
+pub use states::Metadata;
 pub use draw::BufferWithCursor;
 pub use chart::Chart;
 
