@@ -3,6 +3,7 @@ use serde::Serialize;
 use crate::{
     LINE_STATES,
     chart::{self},
+    states_effect, states_judge, states_statistics, states_lines,
 };
 
 pub struct LineState {
@@ -123,4 +124,13 @@ pub fn reset_note_state(before_time_in_second: f64) {
             process_notes(&mut line.notes_below_state);
         });
     });
+    states_statistics::refresh_chart_statistics();
+}
+
+pub fn tick_all(time_in_second: f64, delta_time_in_second: f64, auto: bool) {
+    states_lines::tick_lines(time_in_second);
+    states_effect::tick_effect(delta_time_in_second);
+    if states_judge::tick_lines_judge(delta_time_in_second, auto){
+        states_statistics::refresh_chart_statistics();
+    }
 }

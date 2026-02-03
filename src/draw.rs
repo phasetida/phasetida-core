@@ -1,5 +1,5 @@
 use crate::chart::{Note, NoteType};
-use crate::effect::{HitEffect, SoundEffect, SplashEffect};
+use crate::states_effect::{HitEffect, SoundEffect, SplashEffect};
 use crate::math::{self, Point};
 use crate::renders::{
     self, Dense, RendClickEffect, RendNote, RendPoint, RendSound, RendSplashEffect, RendStatistics,
