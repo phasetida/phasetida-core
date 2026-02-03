@@ -21,20 +21,6 @@ pub trait BufferWithCursor {
     fn write(&mut self, slice: &[u8]);
 }
 
-// struct BufferWithCursor<'a> {
-//     buffer: &'a js_sys::Uint8Array,
-//     cursor: usize,
-// }
-
-// impl<'a> BufferWithCursor<'a> {
-//     fn write(&mut self, slice: &[u8]) {
-//         slice.iter().for_each(|it| {
-//             self.buffer.set_index(self.cursor as u32, *it);
-//             self.cursor += 1;
-//         });
-//     }
-// }
-
 impl Default for DrawImageOffset {
     fn default() -> Self {
         DrawImageOffset {
