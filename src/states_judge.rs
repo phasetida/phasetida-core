@@ -1,10 +1,10 @@
 use crate::{
     LINE_STATES, TOUCH_STATES,
     chart::{Note, NoteType},
-    states_effect,
     input::TouchInfo,
     math::{self, Point},
     states::{LineState, NoteScore, NoteState},
+    states_effect,
 };
 
 pub fn tick_lines_judge(delta_time_in_second: f64, auto: bool) -> bool {
@@ -331,7 +331,11 @@ fn tick_hold_note_common(
                     is_in_judge_range && touch.enable
                 })
             {
-                note.hold_cool_down += 16.0;
+                note.hold_cool_down = if note.hold_cool_down < -16.0 {
+                    0.0
+                } else {
+                    note.hold_cool_down + 16.0
+                };
                 create_splash(current_tick, root_x, root_y, note.extra_score);
             } else {
                 note.score = NoteScore::Miss;
