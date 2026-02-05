@@ -1,9 +1,11 @@
 use std::collections::HashSet;
 
 use crate::{
-    LINE_STATES,
+    CHART_STATISTICS, FLATTEN_NOTE_INDEX, HIT_EFFECT_POOL, LINE_STATES, SOUND_POOL,
+    SPLASH_EFFECT_POOL, TOUCH_STATES,
     chart::{self, JudgeLine, WithTimeRange},
-    states::{LineState, Metadata, NoteState, get_seconds_per_tick}, states_statistics,
+    states::{LineState, Metadata, NoteState, get_seconds_per_tick},
+    states_statistics,
 };
 
 pub fn init_line_states(mut chart: chart::Chart) -> Metadata {
@@ -16,7 +18,7 @@ pub fn init_line_states(mut chart: chart::Chart) -> Metadata {
             line
         })
         .collect::<Vec<_>>();
-    let metadata=LINE_STATES.with_borrow_mut(|states| {
+    let metadata = LINE_STATES.with_borrow_mut(|states| {
         *states = std::array::from_fn(|_| std::default::Default::default());
         let iter = chart.judge_line_list.into_iter().enumerate();
         let available_len = iter.len();
@@ -62,6 +64,16 @@ pub fn init_line_states(mut chart: chart::Chart) -> Metadata {
     });
     states_statistics::init_flatten_line_state();
     metadata
+}
+
+pub fn clear_states() {
+    FLATTEN_NOTE_INDEX.with_borrow_mut(|it| it.clear());
+    LINE_STATES.with_borrow_mut(|it| *it = std::array::from_fn(|_| Default::default()));
+    TOUCH_STATES.with_borrow_mut(|it| *it = std::array::from_fn(|_| Default::default()));
+    HIT_EFFECT_POOL.with_borrow_mut(|it| *it = std::array::from_fn(|_| Default::default()));
+    SPLASH_EFFECT_POOL.with_borrow_mut(|it| *it = std::array::from_fn(|_| Default::default()));
+    CHART_STATISTICS.with_borrow_mut(|it| *it = Default::default());
+    SOUND_POOL.with_borrow_mut(|it| *it = Default::default());
 }
 
 fn process_highlight(judge_line_states: &mut [LineState]) {

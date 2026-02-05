@@ -2,15 +2,15 @@ use std::cell::RefCell;
 
 mod chart;
 mod draw;
-mod states_effect;
 mod input;
 mod math;
 mod renders;
 mod states;
+mod states_effect;
 mod states_initializing;
 mod states_judge;
-mod states_statistics;
 mod states_lines;
+mod states_statistics;
 
 thread_local! {
     pub static DRAW_IMAGE_OFFSET:RefCell<draw::DrawImageOffset> = RefCell::new(std::default::Default::default());
@@ -23,18 +23,19 @@ thread_local! {
     pub static SOUND_POOL: RefCell<states_effect::SoundEffect> = RefCell::new(std::default::Default::default());
 }
 
-pub use states::Metadata;
-pub use draw::BufferWithCursor;
 pub use chart::Chart;
+pub use draw::BufferWithCursor;
+pub use states::Metadata;
 
 pub use draw::load_image_offset;
 pub use draw::process_state_to_drawable;
 
-pub use states_judge::tick_lines_judge;
-pub use states_statistics::refresh_chart_statistics;
-pub use states_lines::tick_lines;
 pub use states_effect::tick_effect;
+pub use states_judge::tick_lines_judge;
+pub use states_lines::tick_lines;
+pub use states_statistics::refresh_chart_statistics;
 
+pub use states_initializing::clear_states;
 pub use states_initializing::init_line_states;
 
 pub use states::reset_note_state;
