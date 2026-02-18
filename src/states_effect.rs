@@ -87,7 +87,7 @@ impl Rng {
 
 const RATE: f64 = 2.0;
 
-pub fn tick_effect(delta_time_in_second: f64) {
+pub(crate) fn tick_effect(delta_time_in_second: f64) {
     HIT_EFFECT_POOL.with_borrow_mut(|pool| {
         pool.iter_mut().for_each(|it| {
             if it.enable {

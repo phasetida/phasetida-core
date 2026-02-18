@@ -1,2 +1,8 @@
+![](https://avatars.githubusercontent.com/u/254232100?s=128&v=4)  
+(欸...?)
 # phasetida-core
-[WIP] 这个仓库还在施工的说，为了将来更好的移植性，傻呗nofyso准备从原来的[phasetida-wasm-core](https://github.com/phasetida/phasetida-wasm-core)剥离出这个仓库  
+[WIP] 一个简单的Rust库，将[Phigros](https://www.taptap.cn/app/165287)官方铺面格式JSON渲染为紧凑的结构体  
+支持v1和v3版本的铺面文件
+
+## 提醒
+本仓库为实验性玩具项目，所以文档十分潦草，功能可能不稳定

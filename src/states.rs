@@ -45,8 +45,11 @@ pub struct NoteState {
     pub extra_score: NoteScore,
 }
 
+/// Metadata of the level
 #[derive(Serialize)]
 pub struct Metadata {
+
+    /// The estimated length of the chart
     pub length_in_second: f64,
 }
 
@@ -99,6 +102,7 @@ pub fn get_seconds_per_tick(bpm: f64) -> f64 {
     60.0 / bpm / 32.0
 }
 
+/// Reset the state of notes that before the `before_time_in_second` to PERFECT
 pub fn reset_note_state(before_time_in_second: f64) {
     LINE_STATES.with_borrow_mut(|state| {
         state.iter_mut().for_each(|line| {
@@ -127,6 +131,7 @@ pub fn reset_note_state(before_time_in_second: f64) {
     states_statistics::refresh_chart_statistics();
 }
 
+/// Ticking all states, including lines, judges and chart statistics
 pub fn tick_all(time_in_second: f64, delta_time_in_second: f64, auto: bool) {
     states_lines::tick_lines(time_in_second);
     states_effect::tick_effect(delta_time_in_second);

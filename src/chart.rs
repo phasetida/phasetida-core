@@ -1,15 +1,25 @@
 use serde::Deserialize;
 
+/// The raw chart format
 #[derive(Clone)]
 pub enum ChartRaw {
+    /// The old format of chart
     V1(ChartV1),
+
+    /// The new(standard) format of chart
     V3(Chart),
 }
 
+/// The standard(v3) format of chart
 #[derive(Deserialize, Clone)]
 pub struct Chart {
+    /// The offset of the chart, in seconds. If the value is greater than 0, 
+    /// the chart should be played slower than the music, meaning it will lag 
+    /// behind by the specified number of seconds.
     #[serde(rename = "offset")]
     pub _offset: f64,
+
+    /// The list of the judge lines
     #[serde(rename = "judgeLineList")]
     pub judge_line_list: Vec<JudgeLine>,
 }
@@ -253,6 +263,7 @@ impl<'de> Deserialize<'de> for ChartRaw {
 }
 
 impl ChartRaw {
+    /// Convert any chart to standard v3 format
     pub fn convert_to_v3(self) -> Chart {
         match self {
             ChartRaw::V1(v1) => Chart {
