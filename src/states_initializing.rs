@@ -3,10 +3,15 @@ use std::collections::HashSet;
 use crate::{
     CHART_STATISTICS, FLATTEN_NOTE_INDEX, HIT_EFFECT_POOL, LINE_STATES, SOUND_POOL,
     SPLASH_EFFECT_POOL, TOUCH_STATES,
-    chart::{self, JudgeLine, WithTimeRange},
+    chart::{self, ChartRaw, JudgeLine, WithTimeRange},
     states::{LineState, Metadata, NoteState, get_seconds_per_tick},
     states_statistics,
 };
+
+pub fn init_line_states_from_json(json: String) -> Result<Metadata, serde_json::Error> {
+    let chart_raw = serde_json::from_str::<ChartRaw>(json.as_str())?;
+    Ok(init_line_states(chart_raw.convert_to_v3()))
+}
 
 pub fn init_line_states(mut chart: chart::Chart) -> Metadata {
     chart.judge_line_list = chart
