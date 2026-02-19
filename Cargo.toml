@@ -1,6 +1,6 @@
 [package]
 name = "phasetida-core"
-version = "0.1.11"
+version = "0.1.12"
 edition = "2024"
 
 [lib]
@@ -8,3 +8,4 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 serde = {version = "1.0.228", features = ["derive"]}
+serde_json = "1.0.149"

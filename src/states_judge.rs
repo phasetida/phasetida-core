@@ -7,7 +7,7 @@ use crate::{
     states_effect,
 };
 
-pub fn tick_lines_judge(delta_time_in_second: f64, auto: bool) -> bool {
+pub(crate) fn tick_lines_judge(delta_time_in_second: f64, auto: bool) -> bool {
     states_effect::clear_sound_effect();
     TOUCH_STATES.with_borrow_mut(|touches| {
         LINE_STATES.with_borrow_mut(|lines| {

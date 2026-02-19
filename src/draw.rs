@@ -1,10 +1,10 @@
 use crate::chart::{Note, NoteType};
-use crate::states_effect::{HitEffect, SoundEffect, SplashEffect};
 use crate::math::{self, Point};
 use crate::renders::{
     self, Dense, RendClickEffect, RendNote, RendPoint, RendSound, RendSplashEffect, RendStatistics,
 };
 use crate::states::{LineState, NoteScore, NoteState};
+use crate::states_effect::{HitEffect, SoundEffect, SplashEffect};
 use crate::{
     CHART_STATISTICS, DRAW_IMAGE_OFFSET, HIT_EFFECT_POOL, LINE_STATES, SOUND_POOL,
     SPLASH_EFFECT_POOL, TOUCH_STATES,
@@ -17,7 +17,13 @@ pub struct DrawImageOffset {
     pub hold_end_highlight_height: f64,
 }
 
+/// A trait for observing write operations on a buffer.
+///
+/// The caller needs to implement this trait to listen for write events on the
+/// buffer, which typically contains a cursor.
 pub trait BufferWithCursor {
+
+    /// Called when `slice` is written to the buffer.
     fn write(&mut self, slice: &[u8]);
 }
 
@@ -32,6 +38,9 @@ impl Default for DrawImageOffset {
     }
 }
 
+/// Preloads image section heights.
+///
+/// Takes heights for hold_head/hold_end sections in both normal and highlighted states.
 pub fn load_image_offset(
     hold_head_height: f64,
     hold_head_highlight_height: f64,
@@ -48,6 +57,9 @@ pub fn load_image_offset(
     });
 }
 
+/// Render and writes the internal state to the buffer.
+///
+/// The state is written by calling `write` on the provided `BufferWithCursor`.
 pub fn process_state_to_drawable(wrapped_buffer: &mut impl BufferWithCursor) {
     CHART_STATISTICS.with_borrow(|statistics| {
         wrapped_buffer.write(
@@ -63,9 +75,7 @@ pub fn process_state_to_drawable(wrapped_buffer: &mut impl BufferWithCursor) {
     });
     LINE_STATES.with_borrow(|states| {
         DRAW_IMAGE_OFFSET.with_borrow(|offset| {
-            states
-                .iter()
-                .for_each(|it| write_line(wrapped_buffer, it));
+            states.iter().for_each(|it| write_line(wrapped_buffer, it));
             write_notes(wrapped_buffer, states.as_ref(), offset);
         });
     });

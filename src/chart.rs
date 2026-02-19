@@ -1,13 +1,35 @@
 use serde::Deserialize;
 
+/// The raw chart format
+#[derive(Clone)]
+pub enum ChartRaw {
+    /// The old format of chart
+    V1(ChartV1),
+
+    /// The new(standard) format of chart
+    V3(Chart),
+}
+
+/// The standard(v3) format of chart
 #[derive(Deserialize, Clone)]
 pub struct Chart {
-    #[serde(rename = "formatVersion")]
-    pub _format_version: i32,
+    /// The offset of the chart, in seconds. If the value is greater than 0, 
+    /// the chart should be played slower than the music, meaning it will lag 
+    /// behind by the specified number of seconds.
+    #[serde(rename = "offset")]
+    pub _offset: f64,
+
+    /// The list of the judge lines
+    #[serde(rename = "judgeLineList")]
+    pub judge_line_list: Vec<JudgeLine>,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct ChartV1 {
     #[serde(rename = "offset")]
     pub _offset: f64,
     #[serde(rename = "judgeLineList")]
-    pub judge_line_list: Vec<JudgeLine>,
+    pub judge_line_list: Vec<JudgeLineV1>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -21,6 +43,23 @@ pub struct JudgeLine {
     pub speed_events: Vec<Event1>,
     #[serde(rename = "judgeLineMoveEvents")]
     pub move_events: Vec<Event4>,
+    #[serde(rename = "judgeLineRotateEvents")]
+    pub rotate_events: Vec<Event2>,
+    #[serde(rename = "judgeLineDisappearEvents")]
+    pub alpha_events: Vec<Event2>,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct JudgeLineV1 {
+    pub bpm: f64,
+    #[serde(rename = "notesAbove")]
+    pub notes_above: Vec<Note>,
+    #[serde(rename = "notesBelow")]
+    pub notes_below: Vec<Note>,
+    #[serde(rename = "speedEvents")]
+    pub speed_events: Vec<Event1>,
+    #[serde(rename = "judgeLineMoveEvents")]
+    pub move_events: Vec<Event2>,
     #[serde(rename = "judgeLineRotateEvents")]
     pub rotate_events: Vec<Event2>,
     #[serde(rename = "judgeLineDisappearEvents")]
@@ -195,5 +234,75 @@ impl WithTimeRange for Event4 {
     }
     fn time_end(&self) -> f64 {
         self.end_time
+    }
+}
+
+impl<'de> Deserialize<'de> for ChartRaw {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+        let version = value
+            .get("formatVersion")
+            .and_then(|it| it.as_i64())
+            .ok_or(serde::de::Error::missing_field("formatVersion"))?;
+        match version {
+            1 => Ok(ChartRaw::V1(
+                serde_json::from_value::<ChartV1>(value).map_err(serde::de::Error::custom)?,
+            )),
+            3 => Ok(ChartRaw::V3(
+                serde_json::from_value::<Chart>(value).map_err(serde::de::Error::custom)?,
+            )),
+            _ => Err(serde::de::Error::custom(format!(
+                "unknown version: {}",
+                version
+            ))),
+        }
+    }
+}
+
+impl ChartRaw {
+    /// Convert any chart to standard v3 format
+    pub fn convert_to_v3(self) -> Chart {
+        match self {
+            ChartRaw::V1(v1) => Chart {
+                _offset: v1._offset,
+                judge_line_list: v1.judge_line_list.into_iter().map(|it| it.into()).collect(),
+            },
+            ChartRaw::V3(v3) => v3,
+        }
+    }
+}
+
+impl From<JudgeLineV1> for JudgeLine {
+    fn from(value: JudgeLineV1) -> Self {
+        let v2_move_event = value
+            .move_events
+            .into_iter()
+            .map(|it| {
+                let start_x = (it.start / 1000.0).floor();
+                let start_y = it.start - start_x * 1000.0;
+                let end_x = (it.end / 1000.0).floor();
+                let end_y = it.end - end_x * 1000.0;
+                Event4 {
+                    start_time: it.start_time,
+                    end_time: it.end_time,
+                    start: start_x / 880.0,
+                    end: end_x / 880.0,
+                    start2: start_y / 520.0,
+                    end2: end_y / 520.0,
+                }
+            })
+            .collect();
+        JudgeLine {
+            bpm: value.bpm,
+            notes_above: value.notes_above,
+            notes_below: value.notes_below,
+            speed_events: value.speed_events,
+            move_events: v2_move_event,
+            rotate_events: value.rotate_events,
+            alpha_events: value.alpha_events,
+        }
     }
 }

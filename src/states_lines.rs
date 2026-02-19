@@ -6,7 +6,7 @@ use crate::{
     states::LineState,
 };
 
-pub fn tick_lines(time_in_second: f64) {
+pub(crate) fn tick_lines(time_in_second: f64) {
     LINE_STATES
         .with_borrow_mut(|x| {
             for state in x.iter_mut() {

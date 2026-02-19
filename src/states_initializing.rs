@@ -3,11 +3,22 @@ use std::collections::HashSet;
 use crate::{
     CHART_STATISTICS, FLATTEN_NOTE_INDEX, HIT_EFFECT_POOL, LINE_STATES, SOUND_POOL,
     SPLASH_EFFECT_POOL, TOUCH_STATES,
-    chart::{self, JudgeLine, WithTimeRange},
+    chart::{self, ChartRaw, JudgeLine, WithTimeRange},
     states::{LineState, Metadata, NoteState, get_seconds_per_tick},
     states_statistics,
 };
 
+/// Initialize state of lines from raw json.
+///
+/// # Errors
+///
+/// This function will return an error if the deserialization failed.
+pub fn init_line_states_from_json(json: String) -> Result<Metadata, serde_json::Error> {
+    let chart_raw = serde_json::from_str::<ChartRaw>(json.as_str())?;
+    Ok(init_line_states(chart_raw.convert_to_v3()))
+}
+
+/// Initialize state of lines from standard V3 chart
 pub fn init_line_states(mut chart: chart::Chart) -> Metadata {
     chart.judge_line_list = chart
         .judge_line_list
@@ -66,6 +77,7 @@ pub fn init_line_states(mut chart: chart::Chart) -> Metadata {
     metadata
 }
 
+/// Clear the states of lines
 pub fn clear_states() {
     FLATTEN_NOTE_INDEX.with_borrow_mut(|it| it.clear());
     LINE_STATES.with_borrow_mut(|it| *it = std::array::from_fn(|_| Default::default()));

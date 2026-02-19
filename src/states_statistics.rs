@@ -83,7 +83,7 @@ fn _init_flatten_line_state(line_state: &[LineState], flatten_index: &mut Vec<No
     *flatten_index = o;
 }
 
-pub fn refresh_chart_statistics() {
+pub(crate) fn refresh_chart_statistics() {
     LINE_STATES.with_borrow(|line_states| {
         FLATTEN_NOTE_INDEX.with_borrow(|flatten_index| {
             CHART_STATISTICS.with_borrow_mut(|chart_statistics| {
