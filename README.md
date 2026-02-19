@@ -1,4 +1,4 @@
-![](https://avatars.githubusercontent.com/u/254232100?s=128&v=4)  
+![](https://avatars.githubusercontent.com/u/254232100?s=256&v=4)  
 (欸...?)
 # phasetida-core
 [WIP] 一个简单的Rust库，将[Phigros](https://www.taptap.cn/app/165287)官方铺面格式JSON渲染为紧凑的结构体  
