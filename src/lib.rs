@@ -7,26 +7,11 @@
 //! This library only maintains states, you need to provide time parameter for
 //! ticking the states
 //!
-//! # Example
-//!
-//! ```rust
-//! fn main() {
-//!     phasetida_core::clear_states();
-//!     let length = phasetida_core::init_line_states_from_json(json).unwrap();
-//!     phasetida_core::load_image_offset(
-//!         /*hold_head_height*/1.14,
-//!         /*hold_head_highlight_height*/5.14,
-//!         /*hold_end_height*/1.91,
-//!         /*hold_end_highlight_height*/9.810,
-//!     );
-//!     let mut your_buffer=YourBuffer::new();
-//!     phasetida_core::process_state_to_drawable(&mut your_buffer);
-//!     // process your buffer
-//! }
-//! ```
 //!
 
+#![deny(clippy::pedantic)]
 #![deny(missing_docs)]
+#![allow(clippy::cast_possible_truncation)]
 
 use std::cell::RefCell;
 
@@ -38,20 +23,20 @@ mod renders;
 mod states;
 mod states_effect;
 mod states_initializing;
+mod states_input;
 mod states_judge;
 mod states_lines;
 mod states_statistics;
-mod states_input;
 
 thread_local! {
-    pub(crate) static DRAW_IMAGE_OFFSET:RefCell<draw::DrawImageOffset> = RefCell::new(std::default::Default::default());
-    pub(crate) static FLATTEN_NOTE_INDEX:RefCell<Vec<states_statistics::NoteIndex>>= RefCell::new(Vec::<_>::new());
-    pub(crate) static LINE_STATES: RefCell<[states::LineState;50]> = RefCell::new(std::array::from_fn(|_|std::default::Default::default()));
-    pub(crate) static TOUCH_STATES: RefCell<[input::TouchInfo; 30]> = RefCell::new(std::array::from_fn(|_|std::default::Default::default()));
-    pub(crate) static HIT_EFFECT_POOL: RefCell<[states_effect::HitEffect; 64]> = RefCell::new(std::array::from_fn(|_|std::default::Default::default()));
-    pub(crate) static SPLASH_EFFECT_POOL : RefCell<[states_effect::SplashEffect;256]> = RefCell::new(std::array::from_fn(|_|std::default::Default::default()));
-    pub(crate) static CHART_STATISTICS: RefCell<states_statistics::ChartStatistics> = RefCell::new(std::default::Default::default());
-    pub(crate) static SOUND_POOL: RefCell<states_effect::SoundEffect> = RefCell::new(std::default::Default::default());
+    pub(crate) static DRAW_IMAGE_OFFSET:RefCell<draw::DrawImageOffset> = RefCell::new(draw::DrawImageOffset::default());
+    pub(crate) static FLATTEN_NOTE_INDEX:RefCell<Vec<states_statistics::NoteIndex>>= const{RefCell::new(Vec::<_>::new())};
+    pub(crate) static LINE_STATES: RefCell<[states::LineState;50]> = RefCell::new(std::array::from_fn(|_|states::LineState::default()));
+    pub(crate) static TOUCH_STATES: RefCell<[input::TouchInfo; 30]> = RefCell::new(std::array::from_fn(|_|input::TouchInfo::default()));
+    pub(crate) static HIT_EFFECT_POOL: RefCell<[states_effect::HitEffect; 64]> = RefCell::new(std::array::from_fn(|_|states_effect::HitEffect::default()));
+    pub(crate) static SPLASH_EFFECT_POOL : RefCell<[states_effect::SplashEffect;256]> = RefCell::new(std::array::from_fn(|_|states_effect::SplashEffect::default()));
+    pub(crate) static CHART_STATISTICS: RefCell<states_statistics::ChartStatistics> = RefCell::new(states_statistics::ChartStatistics::default());
+    pub(crate) static SOUND_POOL: RefCell<states_effect::SoundEffect> = RefCell::new(states_effect::SoundEffect::default());
 }
 
 pub use chart::Chart;
@@ -66,10 +51,10 @@ pub use states_initializing::clear_states;
 pub use states_initializing::init_line_states;
 pub use states_initializing::init_line_states_from_json;
 
+pub use states_input::clear_touch;
 pub use states_input::set_touch_down;
 pub use states_input::set_touch_move;
 pub use states_input::set_touch_up;
-pub use states_input::clear_touch;
 
 pub use states::reset_note_state;
 pub use states::tick_all;

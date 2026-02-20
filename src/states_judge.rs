@@ -11,9 +11,7 @@ pub(crate) fn tick_lines_judge(delta_time_in_second: f64, auto: bool) -> bool {
     states_effect::clear_sound_effect();
     TOUCH_STATES.with_borrow_mut(|touches| {
         LINE_STATES.with_borrow_mut(|lines| {
-            let judged =
-                tick_line_judge(delta_time_in_second, touches.as_mut(), lines.as_mut(), auto);
-            judged
+            tick_line_judge(delta_time_in_second, touches.as_mut(), lines.as_mut(), auto)
         })
     })
 }
@@ -25,9 +23,9 @@ fn tick_line_judge(
     auto: bool,
 ) -> bool {
     let mut judged = false;
-    lines.iter_mut().for_each(|line| {
+    for line in lines.iter_mut() {
         if !line.enable {
-            return;
+            continue;
         }
         let current_tick = line.tick_time;
         line.notes_above_state
@@ -38,7 +36,7 @@ fn tick_line_judge(
                 let line_y = line.y;
                 let line_rotate = line.rotate;
                 let bpm = line.bpm;
-                let note_type = note.note.note_type;
+                let note_type = note.note.r#type;
                 let local_judged = if auto {
                     match note_type {
                         NoteType::Hold => tick_hold_note_auto(
@@ -102,13 +100,13 @@ fn tick_line_judge(
                     }
                 };
                 judged |= local_judged;
-            })
-    });
-    touches.iter_mut().for_each(|touch| {
+            });
+    }
+    for touch in touches.iter_mut() {
         if touch.enable {
             touch.touch_valid = false;
         }
-    });
+    }
     judged
 }
 
@@ -142,8 +140,8 @@ fn check_point_in_judge_range(
         line_x,
         line_y,
         line_rotate,
-        *touch_x as f64,
-        *touch_y as f64,
+        f64::from(*touch_x),
+        f64::from(*touch_y),
     );
     (
         math::is_point_in_judge_range(
@@ -163,7 +161,7 @@ fn check_judge_result(current_tick: f64, note: &NoteState, bpm: f64) -> (f64, No
     let perfect_range_in_tick = 0.08 / seconds_per_tick;
     let good_range_in_tick = 0.16 / seconds_per_tick;
     let bad_range_in_tick = 0.18 / seconds_per_tick;
-    let time_delta = current_tick - note.note.time as f64;
+    let time_delta = current_tick - f64::from(note.note.time);
     (
         time_delta,
         match time_delta.abs() {
@@ -180,7 +178,7 @@ fn create_splash(seed: f64, x: f64, y: f64, note_score: NoteScore) {
         NoteScore::Perfect => states_effect::new_click_effect(seed, x, y, 0),
         NoteScore::Good => states_effect::new_click_effect(seed, x, y, 1),
         _ => {}
-    };
+    }
 }
 
 fn tick_normal_note_auto(
@@ -207,7 +205,7 @@ fn tick_normal_note_auto(
         );
         note.score = NoteScore::Perfect;
         create_splash(current_tick, root_x, root_y, NoteScore::Perfect);
-        states_effect::new_sound_effect(note.note.note_type);
+        states_effect::new_sound_effect(note.note.r#type);
         return true;
     }
     false
@@ -266,6 +264,7 @@ fn tick_flick_note(
     false
 }
 
+#[allow(clippy::too_many_arguments)]
 fn tick_hold_note_auto(
     delta_time_in_second: f64,
     current_tick: f64,
@@ -298,6 +297,7 @@ fn tick_hold_note_auto(
     .1
 }
 
+#[allow(clippy::too_many_arguments)]
 fn tick_hold_note_common(
     delta_time_in_second: f64,
     current_tick: f64,
@@ -342,7 +342,7 @@ fn tick_hold_note_common(
                 judged = true;
             }
         }
-        if note.note.hold_time + note.note.time as f64 <= current_tick {
+        if note.note.hold_time + f64::from(note.note.time) <= current_tick {
             note.score = note.extra_score;
             judged = true;
         }
@@ -351,6 +351,7 @@ fn tick_hold_note_common(
     (false, false)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn tick_hold_note(
     delta_time_in_second: f64,
     current_tick: f64,

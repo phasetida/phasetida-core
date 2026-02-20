@@ -6,9 +6,9 @@ pub struct Point {
 
 enum Gx {
     I,
-    II,
-    III,
-    IV,
+    Ii,
+    Iii,
+    Iv,
 }
 
 pub static WORLD_WIDTH: f64 = 1920.0;
@@ -19,9 +19,9 @@ pub static UNIT_HEIGHT: f64 = WORLD_HEIGHT * 0.6;
 fn get_gx(valid_degree: f64) -> Gx {
     match valid_degree {
         315.0..=360.0 | 0.0..=45.0 => Gx::I,
-        45.0..=135.0 => Gx::II,
-        135.0..=225.0 => Gx::III,
-        225.0..=315.0 => Gx::IV,
+        45.0..=135.0 => Gx::Ii,
+        135.0..=225.0 => Gx::Iii,
+        225.0..=315.0 => Gx::Iv,
         _ => panic!(""),
     }
 }
@@ -32,23 +32,23 @@ pub fn get_cross_point_with_screen(line_x: f64, line_y: f64, valid_degree: f64) 
     let sin = rad.sin();
     let cos = rad.cos();
     let tan_cot = match gx {
-        Gx::I | Gx::III => sin / cos,
-        Gx::II | Gx::IV => cos / sin,
+        Gx::I | Gx::Iii => sin / cos,
+        Gx::Ii | Gx::Iv => cos / sin,
     };
     match gx {
         Gx::I => Point {
             x: WORLD_WIDTH,
             y: line_y + (WORLD_WIDTH - line_x) * tan_cot,
         },
-        Gx::II => Point {
+        Gx::Ii => Point {
             x: line_x + tan_cot * (WORLD_HEIGHT - line_y),
             y: WORLD_HEIGHT,
         },
-        Gx::III => Point {
+        Gx::Iii => Point {
             x: 0.0,
             y: line_y - line_x * tan_cot,
         },
-        Gx::IV => Point {
+        Gx::Iv => Point {
             x: line_x - line_y * tan_cot,
             y: 0.0,
         },
@@ -88,7 +88,7 @@ pub fn is_point_in_judge_range(
     let sin = rad.sin();
     let cos = rad.cos();
     let (p1, p2) = match gx {
-        Gx::I | Gx::III => {
+        Gx::I | Gx::Iii => {
             let cot_or_tan = sin / cos;
             let ld1 = judge_width / cos;
             let d = point_y - line_y;
@@ -97,7 +97,7 @@ pub fn is_point_in_judge_range(
             let p2 = line_x - (ld2 - ld1);
             (p1, p2)
         }
-        Gx::II | Gx::IV => {
+        Gx::Ii | Gx::Iv => {
             let cot_or_tan = cos / sin;
             let ld1 = judge_width / sin;
             let d = point_y - line_y;
@@ -109,9 +109,9 @@ pub fn is_point_in_judge_range(
     };
     match gx {
         Gx::I => point_x >= p1 && point_x <= p2,
-        Gx::III => point_x >= p2 && point_x <= p1,
-        Gx::II => point_y >= p2 && point_y <= p1,
-        Gx::IV => point_y >= p1 && point_y <= p2,
+        Gx::Iii => point_x >= p2 && point_x <= p1,
+        Gx::Ii => point_y >= p2 && point_y <= p1,
+        Gx::Iv => point_y >= p1 && point_y <= p2,
     }
 }
 
@@ -127,7 +127,7 @@ pub fn get_pos_point_vertical_in_line(
     let sin = rad.sin();
     let cos = rad.cos();
     match gx {
-        Gx::I | Gx::III => {
+        Gx::I | Gx::Iii => {
             let tan = sin / cos;
             let tmp = point_y - line_y - (point_x - line_x) * tan;
             Point {
@@ -135,7 +135,7 @@ pub fn get_pos_point_vertical_in_line(
                 y: point_y - tmp * cos * cos,
             }
         }
-        Gx::II | Gx::IV => {
+        Gx::Ii | Gx::Iv => {
             let cot = cos / sin;
             let tmp = point_x - line_x - (point_y - line_y) * cot;
             Point {

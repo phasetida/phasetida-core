@@ -1,11 +1,13 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, default::Default};
 
 use crate::{
     CHART_STATISTICS, FLATTEN_NOTE_INDEX, HIT_EFFECT_POOL, LINE_STATES, SOUND_POOL,
     SPLASH_EFFECT_POOL, TOUCH_STATES,
     chart::{self, ChartRaw, JudgeLine, WithTimeRange},
+    input::TouchInfo,
     states::{LineState, Metadata, NoteState, get_seconds_per_tick},
-    states_statistics,
+    states_effect::{HitEffect, SoundEffect, SplashEffect},
+    states_statistics::{self, ChartStatistics},
 };
 
 /// Initialize state of lines from raw json.
@@ -13,12 +15,13 @@ use crate::{
 /// # Errors
 ///
 /// This function will return an error if the deserialization failed.
-pub fn init_line_states_from_json(json: String) -> Result<Metadata, serde_json::Error> {
-    let chart_raw = serde_json::from_str::<ChartRaw>(json.as_str())?;
+pub fn init_line_states_from_json(json: &str) -> Result<Metadata, serde_json::Error> {
+    let chart_raw = serde_json::from_str::<ChartRaw>(json)?;
     Ok(init_line_states(chart_raw))
 }
 
 /// Initialize state of lines from standard V3 chart
+#[must_use]
 pub fn init_line_states(chart_raw: chart::ChartRaw) -> Metadata {
     let format_version = match chart_raw {
         ChartRaw::V1(_) => 1,
@@ -35,10 +38,9 @@ pub fn init_line_states(chart_raw: chart::ChartRaw) -> Metadata {
         })
         .collect::<Vec<_>>();
     let metadata = LINE_STATES.with_borrow_mut(|states| {
-        *states = std::array::from_fn(|_| std::default::Default::default());
-        let iter = chart.judge_line_list.into_iter().enumerate();
-        let available_len = iter.len();
-        iter.for_each(|(i, it)| {
+        *states = std::array::from_fn(|_| LineState::default());
+        let available_len = chart.judge_line_list.len();
+        for (i, it) in chart.judge_line_list.into_iter().enumerate() {
             let JudgeLine {
                 bpm,
                 notes_above,
@@ -60,7 +62,7 @@ pub fn init_line_states(chart_raw: chart::ChartRaw) -> Metadata {
                     .into_iter()
                     .map(|it| NoteState {
                         note: it,
-                        ..std::default::Default::default()
+                        ..Default::default()
                     })
                     .collect(),
                 notes_below_state: notes_below
@@ -68,18 +70,21 @@ pub fn init_line_states(chart_raw: chart::ChartRaw) -> Metadata {
                     .into_iter()
                     .map(|it| NoteState {
                         note: it,
-                        ..std::default::Default::default()
+                        ..Default::default()
                     })
                     .collect(),
                 ..Default::default()
             }
-        });
-        (available_len..states.len()).for_each(|it| states[it].enable = false);
+        }
+        states
+            .iter_mut()
+            .skip(available_len)
+            .for_each(|it| it.enable = false);
         process_highlight(states.as_mut());
         Metadata {
             length_in_second: get_estimated_length(states),
-            offset: chart._offset,
-            format_version: format_version,
+            offset: chart.offset,
+            format_version,
         }
     });
     states_statistics::init_flatten_line_state();
@@ -88,25 +93,25 @@ pub fn init_line_states(chart_raw: chart::ChartRaw) -> Metadata {
 
 /// Clear the states of lines
 pub fn clear_states() {
-    FLATTEN_NOTE_INDEX.with_borrow_mut(|it| it.clear());
-    LINE_STATES.with_borrow_mut(|it| *it = std::array::from_fn(|_| Default::default()));
-    TOUCH_STATES.with_borrow_mut(|it| *it = std::array::from_fn(|_| Default::default()));
-    HIT_EFFECT_POOL.with_borrow_mut(|it| *it = std::array::from_fn(|_| Default::default()));
-    SPLASH_EFFECT_POOL.with_borrow_mut(|it| *it = std::array::from_fn(|_| Default::default()));
-    CHART_STATISTICS.with_borrow_mut(|it| *it = Default::default());
-    SOUND_POOL.with_borrow_mut(|it| *it = Default::default());
+    FLATTEN_NOTE_INDEX.with_borrow_mut(std::vec::Vec::clear);
+    LINE_STATES.with_borrow_mut(|it| *it = std::array::from_fn(|_| LineState::default()));
+    TOUCH_STATES.with_borrow_mut(|it| *it = std::array::from_fn(|_| TouchInfo::default()));
+    HIT_EFFECT_POOL.with_borrow_mut(|it| *it = std::array::from_fn(|_| HitEffect::default()));
+    SPLASH_EFFECT_POOL.with_borrow_mut(|it| *it = std::array::from_fn(|_| SplashEffect::default()));
+    CHART_STATISTICS.with_borrow_mut(|it| *it = ChartStatistics::default());
+    SOUND_POOL.with_borrow_mut(|it| *it = SoundEffect::default());
 }
 
 fn process_highlight(judge_line_states: &mut [LineState]) {
     let mut set1 = HashSet::<i32>::new();
     let mut set2 = HashSet::<i32>::new();
-    judge_line_states.iter().for_each(|it| {
+    for it in judge_line_states.iter() {
         if !it.enable {
             return;
         }
         let seconds_per_tick = get_seconds_per_tick(it.bpm);
         let mut process = |notes: &Vec<NoteState>| {
-            notes.iter().for_each(|n| {
+            for n in notes {
                 let tick_time = n.note.time;
                 let second_time = ((seconds_per_tick * 32768.0) as i32) * tick_time;
                 if set1.contains(&second_time) {
@@ -114,39 +119,39 @@ fn process_highlight(judge_line_states: &mut [LineState]) {
                 } else {
                     set1.insert(second_time);
                 }
-            });
+            }
         };
         process(&it.notes_above_state);
         process(&it.notes_below_state);
-    });
-    judge_line_states.iter_mut().for_each(|it| {
+    }
+    for it in judge_line_states.iter_mut() {
         if !it.enable {
             return;
         }
         let seconds_per_tick = get_seconds_per_tick(it.bpm);
         let process = |notes: &mut Vec<NoteState>| {
-            notes.iter_mut().for_each(|n| {
+            for n in notes.iter_mut() {
                 let tick_time = n.note.time;
                 let second_time = ((seconds_per_tick * 32768.0) as i32) * tick_time;
                 if set2.contains(&second_time) {
                     n.highlight = true;
                 }
-            });
+            }
         };
         process(&mut it.notes_above_state);
         process(&mut it.notes_below_state);
-    });
+    }
 }
 
 fn get_estimated_length(state: &[LineState]) -> f64 {
     let note_max_time = state.iter().fold(0.0, |last, it| {
         let seconds_per_tick = get_seconds_per_tick(it.bpm);
         let get_time = |note: &NoteState| -> f64 {
-            (note.note.time as f64 + note.note.hold_time) * seconds_per_tick
+            (f64::from(note.note.time) + note.note.hold_time) * seconds_per_tick
         };
         [
-            it.notes_above_state.last().map(get_time).unwrap_or(0.0),
-            it.notes_below_state.last().map(get_time).unwrap_or(0.0),
+            it.notes_above_state.last().map_or(0.0, get_time),
+            it.notes_below_state.last().map_or(0.0, get_time),
         ]
         .iter()
         .fold(last, |l, i| i.max(l))

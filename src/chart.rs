@@ -13,11 +13,11 @@ pub enum ChartRaw {
 /// The standard(v3) format of chart
 #[derive(Deserialize, Clone)]
 pub struct Chart {
-    /// The offset of the chart, in seconds. If the value is greater than 0, 
-    /// the chart should be played slower than the music, meaning it will lag 
+    /// The offset of the chart, in seconds. If the value is greater than 0,
+    /// the chart should be played slower than the music, meaning it will lag
     /// behind by the specified number of seconds.
     #[serde(rename = "offset")]
-    pub _offset: f64,
+    pub offset: f64,
 
     /// The list of the judge lines
     #[serde(rename = "judgeLineList")]
@@ -27,7 +27,7 @@ pub struct Chart {
 #[derive(Deserialize, Clone)]
 pub struct ChartV1 {
     #[serde(rename = "offset")]
-    pub _offset: f64,
+    pub offset: f64,
     #[serde(rename = "judgeLineList")]
     pub judge_line_list: Vec<JudgeLineV1>,
 }
@@ -105,7 +105,7 @@ impl<'de> Deserialize<'de> for NoteType {
         D: serde::Deserializer<'de>,
     {
         let i = i32::deserialize(deserializer)?;
-        Self::try_from(i).map_err(|_| {
+        Self::try_from(i).map_err(|()| {
             serde::de::Error::invalid_value(serde::de::Unexpected::Signed(0), &"1, 2, 3 or 4")
         })
     }
@@ -114,7 +114,7 @@ impl<'de> Deserialize<'de> for NoteType {
 #[derive(Deserialize, Clone)]
 pub struct Note {
     #[serde(rename = "type")]
-    pub note_type: NoteType,
+    pub r#type: NoteType,
     pub time: i32,
     #[serde(rename = "positionX")]
     pub position_x: f64,
@@ -245,7 +245,7 @@ impl<'de> Deserialize<'de> for ChartRaw {
         let value = serde_json::Value::deserialize(deserializer)?;
         let version = value
             .get("formatVersion")
-            .and_then(|it| it.as_i64())
+            .and_then(serde_json::Value::as_i64)
             .ok_or(serde::de::Error::missing_field("formatVersion"))?;
         match version {
             1 => Ok(ChartRaw::V1(
@@ -255,8 +255,7 @@ impl<'de> Deserialize<'de> for ChartRaw {
                 serde_json::from_value::<Chart>(value).map_err(serde::de::Error::custom)?,
             )),
             _ => Err(serde::de::Error::custom(format!(
-                "unknown version: {}",
-                version
+                "unknown version: {version}"
             ))),
         }
     }
@@ -264,11 +263,16 @@ impl<'de> Deserialize<'de> for ChartRaw {
 
 impl ChartRaw {
     /// Convert any chart to standard v3 format
+    #[must_use]
     pub fn convert_to_v3(self) -> Chart {
         match self {
             ChartRaw::V1(v1) => Chart {
-                _offset: v1._offset,
-                judge_line_list: v1.judge_line_list.into_iter().map(|it| it.into()).collect(),
+                offset: v1.offset,
+                judge_line_list: v1
+                    .judge_line_list
+                    .into_iter()
+                    .map(std::convert::Into::into)
+                    .collect(),
             },
             ChartRaw::V3(v3) => v3,
         }
