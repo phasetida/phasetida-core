@@ -26,3 +26,12 @@ pub fn set_touch_up(id: usize) {
         });
     })
 }
+
+/// Clear the state of touch
+pub fn clear_touch() {
+    TOUCH_STATES.with_borrow_mut(|it| {
+        it.iter_mut().for_each(|touch| {
+            touch.enable = false;
+        });
+    });
+}

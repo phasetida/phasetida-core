@@ -69,6 +69,7 @@ pub use states_initializing::init_line_states_from_json;
 pub use states_input::set_touch_down;
 pub use states_input::set_touch_move;
 pub use states_input::set_touch_up;
+pub use states_input::clear_touch;
 
 pub use states::reset_note_state;
 pub use states::tick_all;
