@@ -22,7 +22,6 @@ pub struct DrawImageOffset {
 /// The caller needs to implement this trait to listen for write events on the
 /// buffer, which typically contains a cursor.
 pub trait BufferWithCursor {
-
     /// Called when `slice` is written to the buffer.
     fn write(&mut self, slice: &[u8]);
 }
@@ -179,12 +178,9 @@ fn write_notes(
             process_notes(it, offset, v1, v2)
         });
     notes
-        .0
-        .iter()
-        .for_each(|it| wrapped_buffer.write(it.to_bytes()));
-    notes
         .1
         .iter()
+        .chain(notes.0.iter())
         .for_each(|it| wrapped_buffer.write(it.to_bytes()));
 }
 

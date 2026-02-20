@@ -29,4 +29,21 @@ impl TouchInfo {
         self.init_x = self.x;
         self.init_y = self.y;
     }
+
+    pub fn touch_down(&mut self, x: f32, y: f32) {
+        self.enable = true;
+        self.touch_valid = true;
+        self.init_x = x;
+        self.init_y = y;
+        self.touch_move(x, y);
+    }
+
+    pub fn touch_move(&mut self, x: f32, y: f32) {
+        self.x = x;
+        self.y = y;
+    }
+
+    pub fn touch_up(&mut self) {
+        self.enable = false;
+    }
 }

@@ -41,6 +41,7 @@ mod states_initializing;
 mod states_judge;
 mod states_lines;
 mod states_statistics;
+mod states_input;
 
 thread_local! {
     pub(crate) static DRAW_IMAGE_OFFSET:RefCell<draw::DrawImageOffset> = RefCell::new(std::default::Default::default());
@@ -64,6 +65,11 @@ pub use draw::process_state_to_drawable;
 pub use states_initializing::clear_states;
 pub use states_initializing::init_line_states;
 pub use states_initializing::init_line_states_from_json;
+
+pub use states_input::set_touch_down;
+pub use states_input::set_touch_move;
+pub use states_input::set_touch_up;
+pub use states_input::clear_touch;
 
 pub use states::reset_note_state;
 pub use states::tick_all;
