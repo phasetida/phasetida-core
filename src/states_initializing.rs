@@ -15,11 +15,16 @@ use crate::{
 /// This function will return an error if the deserialization failed.
 pub fn init_line_states_from_json(json: String) -> Result<Metadata, serde_json::Error> {
     let chart_raw = serde_json::from_str::<ChartRaw>(json.as_str())?;
-    Ok(init_line_states(chart_raw.convert_to_v3()))
+    Ok(init_line_states(chart_raw))
 }
 
 /// Initialize state of lines from standard V3 chart
-pub fn init_line_states(mut chart: chart::Chart) -> Metadata {
+pub fn init_line_states(chart_raw: chart::ChartRaw) -> Metadata {
+    let format_version = match chart_raw {
+        ChartRaw::V1(_) => 1,
+        ChartRaw::V3(_) => 3,
+    };
+    let mut chart = chart_raw.convert_to_v3();
     chart.judge_line_list = chart
         .judge_line_list
         .into_iter()
@@ -71,7 +76,11 @@ pub fn init_line_states(mut chart: chart::Chart) -> Metadata {
         });
         (available_len..states.len()).for_each(|it| states[it].enable = false);
         process_highlight(states.as_mut());
-        get_metadata(states)
+        Metadata {
+            length_in_second: get_estimated_length(states),
+            offset: chart._offset,
+            format_version: format_version,
+        }
     });
     states_statistics::init_flatten_line_state();
     metadata
@@ -129,7 +138,7 @@ fn process_highlight(judge_line_states: &mut [LineState]) {
     });
 }
 
-fn get_metadata(state: &[LineState]) -> Metadata {
+fn get_estimated_length(state: &[LineState]) -> f64 {
     let note_max_time = state.iter().fold(0.0, |last, it| {
         let seconds_per_tick = get_seconds_per_tick(it.bpm);
         let get_time = |note: &NoteState| -> f64 {
@@ -158,7 +167,5 @@ fn get_metadata(state: &[LineState]) -> Metadata {
         .iter()
         .fold(last, |l, i| i.max(l))
     });
-    return Metadata {
-        length_in_second: note_max_time.max(event_max_time),
-    };
+    note_max_time.max(event_max_time)
 }

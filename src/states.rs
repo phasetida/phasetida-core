@@ -51,6 +51,12 @@ pub struct Metadata {
 
     /// The estimated length of the chart
     pub length_in_second: f64,
+
+    /// The offset of the chart
+    pub offset: f64,
+
+    /// The format version of the chart
+    pub format_version: i32,
 }
 
 impl Default for LineState {
