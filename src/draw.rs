@@ -155,9 +155,26 @@ fn write_click_effects(wrapped_buffer: &mut impl BufferWithCursor, states: &[Hit
 }
 
 fn write_line(wrapped_buffer: &mut impl BufferWithCursor, state: &LineState) {
+    fn eq(a: f64, b: f64) -> bool {
+        (a - b).abs() <= f64::EPSILON
+    }
     let p1 = math::get_cross_point_with_screen(state.x, state.y, math::fix_degree(state.rotate));
     let p2 =
         math::get_cross_point_with_screen(state.x, state.y, math::fix_degree(state.rotate + 180.0));
+    if state.alpha <= 0.0 {
+        return;
+    }
+    if (((eq(p1.x, 0.0) && eq(p2.x, math::WORLD_WIDTH))
+        || (eq(p2.x, 0.0) && eq(p1.x, math::WORLD_WIDTH)))
+        && ((p1.y <= 0.0 && p2.y <= 0.0)
+            || (p1.y >= math::WORLD_HEIGHT && p2.y >= math::WORLD_HEIGHT)))
+        || (((eq(p1.y, 0.0) && eq(p2.y, math::WORLD_HEIGHT))
+            || (eq(p2.y, 0.0) && eq(p1.y, math::WORLD_HEIGHT)))
+            && ((p1.x <= 0.0 && p2.x <= 0.0)
+                || (p1.x >= math::WORLD_WIDTH && p2.x >= math::WORLD_WIDTH)))
+    {
+        return;
+    }
     let line = renders::RendLine {
         rend_type: 1,
         x1: p1.x as f32,
@@ -365,6 +382,16 @@ fn process_hold_note(
                 0.0
             },
     );
+    let hold_rect = math::Rect {
+        cx: bx,
+        cy: by,
+        width: math::WORLD_WIDTH / 4.0,
+        height: body_height * math::UNIT_HEIGHT,
+        rotate: rotate.to_radians(),
+    };
+    if !math::check_rectangles_overlap(&math::WORLD_RECT, &hold_rect) {
+        return;
+    }
     let Point { x: ex, y: ey } = math::get_pos_out_of_line(
         temp_x,
         temp_y,
