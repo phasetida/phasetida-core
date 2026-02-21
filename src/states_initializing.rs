@@ -107,7 +107,7 @@ fn process_highlight(judge_line_states: &mut [LineState]) {
     let mut set2 = HashSet::<i32>::new();
     for it in judge_line_states.iter() {
         if !it.enable {
-            return;
+            continue;
         }
         let seconds_per_tick = get_seconds_per_tick(it.bpm);
         let mut process = |notes: &Vec<NoteState>| {
@@ -126,7 +126,7 @@ fn process_highlight(judge_line_states: &mut [LineState]) {
     }
     for it in judge_line_states.iter_mut() {
         if !it.enable {
-            return;
+            continue;
         }
         let seconds_per_tick = get_seconds_per_tick(it.bpm);
         let process = |notes: &mut Vec<NoteState>| {

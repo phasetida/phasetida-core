@@ -139,7 +139,7 @@ fn write_splash_effects(wrapped_buffer: &mut impl BufferWithCursor, states: &[Sp
 fn write_click_effects(wrapped_buffer: &mut impl BufferWithCursor, states: &[HitEffect]) {
     for it in states {
         if !it.enable {
-            return;
+            continue;
         }
         wrapped_buffer.write(
             RendClickEffect {
@@ -298,6 +298,7 @@ fn process_normal_note(
     });
 }
 
+#[allow(clippy::too_many_lines)]
 fn process_hold_note(
     reverse: bool,
     line_state: &LineState,

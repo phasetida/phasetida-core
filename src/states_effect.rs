@@ -96,7 +96,7 @@ pub(crate) fn tick_effect(delta_time_in_second: f64) {
                 it.progress += delta_time_in_second.max(0.0) * RATE;
                 if it.progress >= 1.0 {
                     it.enable = false;
-                    return;
+                    continue;
                 }
                 it.speed -= (it.speed * 7.0 * delta_time_in_second.max(0.0)).max(0.0);
                 it.x += it.speed * it.x_vec * delta_time_in_second.max(0.0);
