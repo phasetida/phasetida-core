@@ -1,4 +1,3 @@
-
 use crate::{
     LINE_STATES,
     chart::{self, TimeState, WithTimeRange, WithValue},
@@ -7,12 +6,11 @@ use crate::{
 };
 
 pub(crate) fn tick_lines(time_in_second: f64) {
-    LINE_STATES
-        .with_borrow_mut(|x| {
-            for state in x.iter_mut() {
-                tick_line_state(time_in_second, state);
-            }
-        });
+    LINE_STATES.with_borrow_mut(|x| {
+        for state in x.iter_mut() {
+            tick_line_state(time_in_second, state);
+        }
+    });
 }
 
 fn get_line_y(tick_time: f64, line: &LineState) -> f64 {
@@ -30,12 +28,13 @@ fn get_line_y(tick_time: f64, line: &LineState) -> f64 {
             break;
         }
         if event.end_time < tick_time {
-            t += (event.end_time - event.start_time) * event.value
+            t += (event.end_time - event.start_time) * event.value;
         }
     }
     t * seconds_per_tick
 }
 
+#[allow(clippy::similar_names)]
 fn tick_line_state(time_in_second: f64, state: &mut LineState) {
     let seconds_per_tick = 60.0 / state.bpm / 32.0;
     let tick_time = time_in_second / seconds_per_tick;
@@ -75,8 +74,8 @@ fn tick_line_state(time_in_second: f64, state: &mut LineState) {
 fn get_current_value_for_event<T, U>(
     tick_time: f64,
     events: &[U],
-    cache_index: i32,
-) -> ((T, T), f64, i32)
+    cache_index: i64,
+) -> ((T, T), f64, i64)
 where
     U: WithValue<T> + WithTimeRange,
 {
@@ -84,53 +83,48 @@ where
         return (U::zero(), 0.0, 0);
     }
     let event_result = find_current_event(tick_time, events, cache_index);
-    match event_result {
-        Ok((event, index, percent)) => (event.get_value(), percent, index),
-        Err(_) => (U::zero(), 0.0, 0),
+    if let Some((event, index, percent)) = event_result {
+        (event.get_value(), percent, index)
+    } else {
+        (U::zero(), 0.0, 0)
     }
 }
 
-fn find_current_event<T>(
-    tick_time: f64,
-    events: &[T],
-    cache_index: i32,
-) -> Result<(&T, i32, f64), ()>
+fn find_current_event<T>(tick_time: f64, events: &[T], cache_index: i64) -> Option<(&T, i64, f64)>
 where
     T: WithTimeRange,
 {
-    let mut i = cache_index.clamp(0, events.len() as i32);
+    let mut i = cache_index.clamp(0, i64::from(events.len() as u32));
     let mut last_result: TimeState = TimeState::During(0.0);
     loop {
-        let op = events.get(i as usize);
-        match op {
-            Some(event) => {
-                let result = event.check_time(tick_time);
-                match result {
-                    chart::TimeState::Early => {
-                        if last_result == chart::TimeState::Late {
-                            return Ok((event, i, 1.0));
-                        }
-                        i -= 1
+        let op = events.get(i.max(0).unsigned_abs() as usize);
+        if let Some(event) = op {
+            let result = event.check_time(tick_time);
+            match result {
+                chart::TimeState::Early => {
+                    if last_result == chart::TimeState::Late {
+                        return Some((event, i, 1.0));
                     }
-                    chart::TimeState::Late => {
-                        if last_result == chart::TimeState::Early {
-                            return Ok((event, i, 1.0));
-                        }
-                        i += 1
+                    i -= 1;
+                }
+                chart::TimeState::Late => {
+                    if last_result == chart::TimeState::Early {
+                        return Some((event, i, 1.0));
                     }
-                    chart::TimeState::During(percent) => return Ok((event, i, percent)),
+                    i += 1;
                 }
-                last_result = result;
+                chart::TimeState::During(percent) => return Some((event, i, percent)),
             }
-            None => {
-                if i <= 0 {
-                    return Err(());
-                }
-                return match events.last() {
-                    Some(x) => Ok((x, events.len() as i32 - 1, 1.0)),
-                    None => Err(()),
-                };
+            last_result = result;
+        } else {
+            if i <= 0 {
+                return None;
             }
+            return if let Some(x) = events.last() {
+                Some((x, i64::from(events.len() as u32) - 1, 1.0))
+            } else {
+                None
+            };
         }
     }
 }

@@ -3,7 +3,7 @@ use serde::Serialize;
 use crate::{
     LINE_STATES,
     chart::{self},
-    states_effect, states_judge, states_statistics, states_lines,
+    states_effect, states_judge, states_lines, states_statistics,
 };
 
 pub struct LineState {
@@ -15,10 +15,10 @@ pub struct LineState {
     pub speed: f64,
     pub line_y: f64,
     pub tick_time: f64,
-    pub event_speed_index_cache: i32,
-    pub event_move_index_cache: i32,
-    pub event_rotate_index_cache: i32,
-    pub event_alpha_index_cache: i32,
+    pub event_speed_index_cache: i64,
+    pub event_move_index_cache: i64,
+    pub event_rotate_index_cache: i64,
+    pub event_alpha_index_cache: i64,
     pub notes_above_state: Vec<NoteState>,
     pub notes_below_state: Vec<NoteState>,
     pub speed_events: Vec<chart::Event1>,
@@ -48,7 +48,6 @@ pub struct NoteState {
 /// Metadata of the level
 #[derive(Serialize)]
 pub struct Metadata {
-
     /// The estimated length of the chart
     pub length_in_second: f64,
 
@@ -93,7 +92,7 @@ impl Default for NoteState {
             hold_cool_down: 0.0,
             extra_score: NoteScore::None,
             note: chart::Note {
-                note_type: chart::NoteType::Tap,
+                r#type: chart::NoteType::Tap,
                 time: 0,
                 position_x: 0.0,
                 hold_time: 0.25,
@@ -111,14 +110,14 @@ pub fn get_seconds_per_tick(bpm: f64) -> f64 {
 /// Reset the state of notes that before the `before_time_in_second` to PERFECT
 pub fn reset_note_state(before_time_in_second: f64) {
     LINE_STATES.with_borrow_mut(|state| {
-        state.iter_mut().for_each(|line| {
+        for line in state.iter_mut() {
             let seconds_per_tick = get_seconds_per_tick(line.bpm);
             let process_notes = |notes: &mut [NoteState]| {
-                notes.iter_mut().for_each(|note| {
+                for note in notes.iter_mut() {
                     note.hold_cool_down = 0.0;
-                    let note_time_in_second = note.note.time as f64 * seconds_per_tick;
+                    let note_time_in_second = f64::from(note.note.time) * seconds_per_tick;
                     let hold_time_in_second =
-                        (note.note.time as f64 + note.note.hold_time) * seconds_per_tick;
+                        (f64::from(note.note.time) + note.note.hold_time) * seconds_per_tick;
                     if note_time_in_second >= before_time_in_second {
                         note.extra_score = NoteScore::None;
                         note.score = NoteScore::None;
@@ -128,11 +127,11 @@ pub fn reset_note_state(before_time_in_second: f64) {
                         note.score = NoteScore::Perfect;
                         note.extra_score = NoteScore::Perfect;
                     }
-                });
+                }
             };
             process_notes(&mut line.notes_above_state);
             process_notes(&mut line.notes_below_state);
-        });
+        }
     });
     states_statistics::refresh_chart_statistics();
 }
@@ -141,7 +140,7 @@ pub fn reset_note_state(before_time_in_second: f64) {
 pub fn tick_all(time_in_second: f64, delta_time_in_second: f64, auto: bool) {
     states_lines::tick_lines(time_in_second);
     states_effect::tick_effect(delta_time_in_second);
-    if states_judge::tick_lines_judge(delta_time_in_second, auto){
+    if states_judge::tick_lines_judge(delta_time_in_second, auto) {
         states_statistics::refresh_chart_statistics();
     }
 }

@@ -1,13 +1,12 @@
-
 use crate::{
     CHART_STATISTICS, FLATTEN_NOTE_INDEX, LINE_STATES,
     states::{self, LineState, NoteState},
 };
 
 pub struct NoteIndex {
-    pub line_index: usize,
+    pub index_in_line: usize,
     pub above: bool,
-    pub note_index: usize,
+    pub index_in_notes: usize,
     pub time_in_second: f64,
 }
 
@@ -32,7 +31,7 @@ impl Default for ChartStatistics {
 impl NoteIndex {
     pub fn index<'a>(&self, line_states: &'a [LineState]) -> Option<&'a NoteState> {
         line_states
-            .get(self.line_index)
+            .get(self.index_in_line)
             .map(|it| {
                 if self.above {
                     &it.notes_above_state
@@ -40,19 +39,19 @@ impl NoteIndex {
                     &it.notes_below_state
                 }
             })
-            .and_then(|it| it.get(self.note_index))
+            .and_then(|it| it.get(self.index_in_notes))
     }
 }
 
 pub fn init_flatten_line_state() {
     LINE_STATES.with_borrow(|line_state| {
         FLATTEN_NOTE_INDEX.with_borrow_mut(|flatten_index| {
-            _init_flatten_line_state(line_state.as_ref(), flatten_index);
+            internal_init_flatten_line_state(line_state.as_ref(), flatten_index);
         });
     });
 }
 
-fn _init_flatten_line_state(line_state: &[LineState], flatten_index: &mut Vec<NoteIndex>) {
+fn internal_init_flatten_line_state(line_state: &[LineState], flatten_index: &mut Vec<NoteIndex>) {
     let mut o = line_state
         .iter()
         .enumerate()
@@ -64,10 +63,11 @@ fn _init_flatten_line_state(line_state: &[LineState], flatten_index: &mut Vec<No
                 i: usize,
             ) -> impl std::iter::Iterator<Item = NoteIndex> {
                 notes.iter().enumerate().map(move |(j, nit)| NoteIndex {
-                    line_index: i,
+                    index_in_line: i,
                     above,
-                    note_index: j,
-                    time_in_second: (nit.note.time as f64 + nit.note.hold_time) * seconds_per_tick,
+                    index_in_notes: j,
+                    time_in_second: (f64::from(nit.note.time) + nit.note.hold_time)
+                        * seconds_per_tick,
                 })
             }
             let seconds_per_tick = states::get_seconds_per_tick(it.bpm);
@@ -79,7 +79,7 @@ fn _init_flatten_line_state(line_state: &[LineState], flatten_index: &mut Vec<No
             ))
         })
         .collect::<Vec<_>>();
-    o.sort_by_key(|it| (it.time_in_second * 100000.0) as i32);
+    o.sort_by_key(|it| (it.time_in_second * 100_000.0) as i32);
     *flatten_index = o;
 }
 
@@ -87,35 +87,37 @@ pub(crate) fn refresh_chart_statistics() {
     LINE_STATES.with_borrow(|line_states| {
         FLATTEN_NOTE_INDEX.with_borrow(|flatten_index| {
             CHART_STATISTICS.with_borrow_mut(|chart_statistics| {
-                _refresh_chart_statistics(line_states, flatten_index, chart_statistics);
+                internal_refresh_chart_statistics(line_states, flatten_index, chart_statistics);
             });
         });
     });
 }
 
-fn _refresh_chart_statistics(
+fn internal_refresh_chart_statistics(
     line_states: &[LineState],
     flatten_index: &[NoteIndex],
     chart_statistics: &mut ChartStatistics,
 ) {
     let mut combos = vec![0u32];
-    flatten_index.iter().for_each(|it| {
+    for it in flatten_index {
         let state = it.index(line_states);
         match state {
             None => {}
             Some(state) => match state.score {
                 states::NoteScore::Perfect | states::NoteScore::Good => {
-                    combos.last_mut().map(|it| *it += 1);
+                    if let Some(it) = combos.last_mut() {
+                        *it += 1;
+                    }
                 }
                 states::NoteScore::Bad | states::NoteScore::Miss => {
                     combos.push(0u32);
                 }
                 states::NoteScore::None => {}
             },
-        };
-    });
-    let max_combo = combos.iter().max().map(|it| *it).unwrap_or(0u32);
-    let current_combo = combos.last().map(|it| *it).unwrap_or(0u32);
+        }
+    }
+    let max_combo = combos.iter().max().copied().unwrap_or(0u32);
+    let current_combo = combos.last().copied().unwrap_or(0u32);
     let judge_results =
         flatten_index
             .iter()
@@ -128,8 +130,10 @@ fn _refresh_chart_statistics(
                 },
             });
     let total_notes = flatten_index.len();
-    let accurate = (judge_results.0 as f64 + judge_results.1 as f64 * 0.65) / total_notes as f64;
-    let score = (max_combo as f64 / total_notes as f64 * 100000.0) + (accurate * 900000.0);
+    let accurate = (f64::from(judge_results.0) + f64::from(judge_results.1) * 0.65)
+        / f64::from(total_notes as u32);
+    let score =
+        (f64::from(max_combo) / f64::from(total_notes as u32) * 100_000.0) + (accurate * 900_000.0);
     *chart_statistics = ChartStatistics {
         combo: current_combo,
         max_combo,

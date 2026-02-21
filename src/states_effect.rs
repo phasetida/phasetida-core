@@ -19,10 +19,12 @@ pub struct SplashEffect {
     pub tint_type: i8,
 }
 
+#[allow(clippy::struct_field_names)]
+#[derive(Default)]
 pub struct SoundEffect {
-    pub tap_sound: i8,
-    pub drag_sound: i8,
-    pub flick_sound: i8,
+    pub tap_count: i8,
+    pub drag_count: i8,
+    pub flick_count: i8,
 }
 
 impl Default for HitEffect {
@@ -52,16 +54,6 @@ impl Default for SplashEffect {
     }
 }
 
-impl Default for SoundEffect {
-    fn default() -> Self {
-        SoundEffect {
-            tap_sound: 0,
-            drag_sound: 0,
-            flick_sound: 0,
-        }
-    }
-}
-
 pub struct Rng {
     state: u64,
 }
@@ -76,8 +68,8 @@ impl Rng {
         self.state ^= self.state >> 12;
         self.state ^= self.state << 25;
         self.state ^= self.state >> 27;
-        let x = self.state.wrapping_mul(0x2545F4914F6CDD1D);
-        (x as u32) as f64 / u32::MAX as f64
+        let x = self.state.wrapping_mul(0x2545_F491_4F6C_DD1D);
+        f64::from(x as u32) / f64::from(u32::MAX)
     }
 
     pub fn range(&mut self, min: f64, max: f64) -> f64 {
@@ -89,29 +81,29 @@ const RATE: f64 = 2.0;
 
 pub(crate) fn tick_effect(delta_time_in_second: f64) {
     HIT_EFFECT_POOL.with_borrow_mut(|pool| {
-        pool.iter_mut().for_each(|it| {
+        for it in pool.iter_mut() {
             if it.enable {
                 it.progress += delta_time_in_second.max(0.0) * RATE;
                 if it.progress >= 1.0 {
                     it.enable = false;
                 }
             }
-        });
+        }
     });
     SPLASH_EFFECT_POOL.with_borrow_mut(|pool| {
-        pool.iter_mut().for_each(|it| {
+        for it in pool.iter_mut() {
             if it.enable {
                 it.progress += delta_time_in_second.max(0.0) * RATE;
                 if it.progress >= 1.0 {
                     it.enable = false;
-                    return;
+                    continue;
                 }
                 it.speed -= (it.speed * 7.0 * delta_time_in_second.max(0.0)).max(0.0);
                 it.x += it.speed * it.x_vec * delta_time_in_second.max(0.0);
                 it.y += it.speed * it.y_vec * delta_time_in_second.max(0.0);
             }
-        });
-    })
+        }
+    });
 }
 
 pub fn new_splash_effect(rng: &mut Rng, x: f64, y: f64, tint_type: i8, count: u8) {
@@ -129,7 +121,7 @@ pub fn new_splash_effect(rng: &mut Rng, x: f64, y: f64, tint_type: i8, count: u8
                 effect.tint_type = tint_type;
                 effect.progress = 0.0;
                 i -= 1;
-                if i <= 0 {
+                if i == 0 {
                     return;
                 }
             }
@@ -138,7 +130,7 @@ pub fn new_splash_effect(rng: &mut Rng, x: f64, y: f64, tint_type: i8, count: u8
 }
 
 pub fn new_click_effect(seed: f64, x: f64, y: f64, tint_type: i8) {
-    let mut rng = Rng::new((seed * 114514.0) as u64);
+    let mut rng = Rng::new((seed * 114_514.0).to_bits());
     HIT_EFFECT_POOL.with_borrow_mut(|pool| {
         for effect in pool.iter_mut() {
             if !effect.enable {
@@ -162,16 +154,16 @@ pub fn new_click_effect(seed: f64, x: f64, y: f64, tint_type: i8) {
 
 pub fn clear_sound_effect() {
     SOUND_POOL.with_borrow_mut(|sounds| {
-        sounds.tap_sound = 0;
-        sounds.drag_sound = 0;
-        sounds.flick_sound = 0;
+        sounds.tap_count = 0;
+        sounds.drag_count = 0;
+        sounds.flick_count = 0;
     });
 }
 
 pub fn new_sound_effect(note_type: NoteType) {
     SOUND_POOL.with_borrow_mut(|sounds| match note_type {
-        NoteType::Tap | NoteType::Hold => sounds.tap_sound += 1,
-        NoteType::Drag => sounds.drag_sound += 1,
-        NoteType::Flick => sounds.flick_sound += 1,
-    })
+        NoteType::Tap | NoteType::Hold => sounds.tap_count += 1,
+        NoteType::Drag => sounds.drag_count += 1,
+        NoteType::Flick => sounds.flick_count += 1,
+    });
 }
