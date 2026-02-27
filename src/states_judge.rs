@@ -1,106 +1,110 @@
 use crate::{
-    LINE_STATES, TOUCH_STATES,
+    FLATTEN_NOTE_INDEX, LINE_STATES, TOUCH_STATES,
     chart::{Note, NoteType},
     input::TouchInfo,
     math::{self, Point},
     states::{LineState, NoteScore, NoteState},
     states_effect,
+    states_statistics::NoteIndex,
 };
 
 pub(crate) fn tick_lines_judge(delta_time_in_second: f64, auto: bool) -> bool {
     states_effect::clear_sound_effect();
     TOUCH_STATES.with_borrow_mut(|touches| {
         LINE_STATES.with_borrow_mut(|lines| {
-            tick_line_judge(delta_time_in_second, touches.as_mut(), lines.as_mut(), auto)
+            FLATTEN_NOTE_INDEX.with_borrow(|flatten_note_index| {
+                tick_line_judge(
+                    delta_time_in_second,
+                    flatten_note_index,
+                    touches.as_mut(),
+                    lines.as_mut(),
+                    auto,
+                )
+            })
         })
     })
 }
 
 fn tick_line_judge(
     delta_time_in_second: f64,
+    flatten_note_index: &[NoteIndex],
     touches: &mut [TouchInfo],
     lines: &mut [LineState],
     auto: bool,
 ) -> bool {
     let mut judged = false;
-    for line in lines.iter_mut() {
+    for note_index in flatten_note_index {
+        let Some(line) = note_index.find_mut_line(lines) else {
+            continue;
+        };
         if !line.enable {
             continue;
         }
         let current_tick = line.tick_time;
-        line.notes_above_state
-            .iter_mut()
-            .chain(line.notes_below_state.iter_mut())
-            .for_each(|note| {
-                let line_x = line.x;
-                let line_y = line.y;
-                let line_rotate = line.rotate;
-                let bpm = line.bpm;
-                let note_type = note.note.r#type;
-                let local_judged = if auto {
-                    match note_type {
-                        NoteType::Hold => tick_hold_note_auto(
-                            delta_time_in_second,
-                            current_tick,
-                            note,
-                            touches,
-                            line_x,
-                            line_y,
-                            line_rotate,
-                            bpm,
-                        ),
-                        _ => tick_normal_note_auto(
-                            current_tick,
-                            note,
-                            line_x,
-                            line_y,
-                            line_rotate,
-                            bpm,
-                        ),
-                    }
-                } else {
-                    match note_type {
-                        NoteType::Tap => tick_tap_note(
-                            current_tick,
-                            note,
-                            touches,
-                            line_x,
-                            line_y,
-                            line_rotate,
-                            bpm,
-                        ),
-                        NoteType::Drag => tick_drag_note(
-                            current_tick,
-                            note,
-                            touches,
-                            line_x,
-                            line_y,
-                            line_rotate,
-                            bpm,
-                        ),
-                        NoteType::Hold => tick_hold_note(
-                            delta_time_in_second,
-                            current_tick,
-                            note,
-                            touches,
-                            line_x,
-                            line_y,
-                            line_rotate,
-                            bpm,
-                        ),
-                        NoteType::Flick => tick_flick_note(
-                            current_tick,
-                            note,
-                            touches,
-                            line_x,
-                            line_y,
-                            line_rotate,
-                            bpm,
-                        ),
-                    }
-                };
-                judged |= local_judged;
-            });
+        let line_x = line.x;
+        let line_y = line.y;
+        let line_rotate = line.rotate;
+        let bpm = line.bpm;
+        let Some(note) = note_index.find_mut_note(line) else {
+            continue;
+        };
+        let note_type = note.note.r#type;
+        let local_judged = if auto {
+            match note_type {
+                NoteType::Hold => tick_hold_note_auto(
+                    delta_time_in_second,
+                    current_tick,
+                    note,
+                    touches,
+                    line_x,
+                    line_y,
+                    line_rotate,
+                    bpm,
+                ),
+                _ => tick_normal_note_auto(current_tick, note, line_x, line_y, line_rotate, bpm),
+            }
+        } else {
+            match note_type {
+                NoteType::Tap => tick_tap_note(
+                    current_tick,
+                    note,
+                    touches,
+                    line_x,
+                    line_y,
+                    line_rotate,
+                    bpm,
+                ),
+                NoteType::Drag => tick_drag_note(
+                    current_tick,
+                    note,
+                    touches,
+                    line_x,
+                    line_y,
+                    line_rotate,
+                    bpm,
+                ),
+                NoteType::Hold => tick_hold_note(
+                    delta_time_in_second,
+                    current_tick,
+                    note,
+                    touches,
+                    line_x,
+                    line_y,
+                    line_rotate,
+                    bpm,
+                ),
+                NoteType::Flick => tick_flick_note(
+                    current_tick,
+                    note,
+                    touches,
+                    line_x,
+                    line_y,
+                    line_rotate,
+                    bpm,
+                ),
+            }
+        };
+        judged |= local_judged;
     }
     for touch in touches.iter_mut() {
         if touch.enable {
@@ -330,6 +334,7 @@ fn tick_hold_note_common(
                         check_point_in_judge_range(line_x, line_y, line_rotate, &note.note, touch);
                     is_in_judge_range && touch.enable
                 })
+                || note.note.hold_time + f64::from(note.note.time) - 16.0 <= current_tick
             {
                 note.hold_cool_down = if note.hold_cool_down < -16.0 {
                     0.0
