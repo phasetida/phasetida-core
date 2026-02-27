@@ -29,17 +29,28 @@ impl Default for ChartStatistics {
 }
 
 impl NoteIndex {
-    pub fn index<'a>(&self, line_states: &'a [LineState]) -> Option<&'a NoteState> {
-        line_states
-            .get(self.index_in_line)
-            .map(|it| {
-                if self.above {
-                    &it.notes_above_state
-                } else {
-                    &it.notes_below_state
-                }
+    pub fn find_note<'a>(&self, line_states: &'a [LineState]) -> Option<&'a NoteState> {
+        line_states.get(self.index_in_line).and_then(|line_state| {
+            (if self.above {
+                &line_state.notes_above_state
+            } else {
+                &line_state.notes_below_state
             })
-            .and_then(|it| it.get(self.index_in_notes))
+            .get(self.index_in_notes)
+        })
+    }
+
+    pub fn find_mut_line<'a>(&self, line_states: &'a mut [LineState]) -> Option<&'a mut LineState> {
+        line_states.get_mut(self.index_in_line)
+    }
+
+    pub fn find_mut_note<'a>(&self, line_state: &'a mut LineState) -> Option<&'a mut NoteState> {
+        (if self.above {
+            &mut line_state.notes_above_state
+        } else {
+            &mut line_state.notes_below_state
+        })
+        .get_mut(self.index_in_notes)
     }
 }
 
@@ -51,8 +62,8 @@ pub fn init_flatten_line_state() {
     });
 }
 
-fn internal_init_flatten_line_state(line_state: &[LineState], flatten_index: &mut Vec<NoteIndex>) {
-    let mut o = line_state
+fn internal_init_flatten_line_state(line_states: &[LineState], flatten_index: &mut Vec<NoteIndex>) {
+    let mut o = line_states
         .iter()
         .enumerate()
         .flat_map(|(i, it)| {
@@ -100,7 +111,7 @@ fn internal_refresh_chart_statistics(
 ) {
     let mut combos = vec![0u32];
     for it in flatten_index {
-        let state = it.index(line_states);
+        let state = it.find_note(line_states);
         match state {
             None => {}
             Some(state) => match state.score {
@@ -121,7 +132,7 @@ fn internal_refresh_chart_statistics(
     let judge_results =
         flatten_index
             .iter()
-            .fold((0, 0), |score, it| match it.index(line_states) {
+            .fold((0, 0), |score, it| match it.find_note(line_states) {
                 None => score,
                 Some(state) => match state.score {
                     states::NoteScore::Perfect => (score.0 + 1, score.1),
