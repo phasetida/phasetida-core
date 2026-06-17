@@ -13,25 +13,36 @@ pub struct Rect {
     pub rotate: f64,
 }
 
+impl Rect {
+    pub fn centered(width: f64, height: f64) -> Self {
+        Self {
+            cx: width / 2.0,
+            cy: height / 2.0,
+            width,
+            height,
+            rotate: 0.0,
+        }
+    }
+
+    pub fn world_default() -> Self {
+        Self::centered(1920.0, 1080.0)
+    }
+
+    pub fn get_unit_width(&self) -> f64 {
+        self.width / 18.0
+    }
+
+    pub fn get_unit_height(&self) -> f64 {
+        self.height * 0.6
+    }
+}
+
 enum Gx {
     I,
     Ii,
     Iii,
     Iv,
 }
-
-pub static WORLD_WIDTH: f64 = 1920.0;
-pub static WORLD_HEIGHT: f64 = 1080.0;
-pub static UNIT_WIDTH: f64 = WORLD_WIDTH / 18.0;
-pub static UNIT_HEIGHT: f64 = WORLD_HEIGHT * 0.6;
-
-pub static WORLD_RECT: Rect = Rect {
-    cx: WORLD_WIDTH / 2.0,
-    cy: WORLD_HEIGHT / 2.0,
-    width: WORLD_WIDTH,
-    height: WORLD_HEIGHT,
-    rotate: 0.0,
-};
 
 fn get_gx(valid_degree: f64) -> Gx {
     match valid_degree {
@@ -43,7 +54,12 @@ fn get_gx(valid_degree: f64) -> Gx {
     }
 }
 
-pub fn get_cross_point_with_screen(line_x: f64, line_y: f64, valid_degree: f64) -> Point {
+pub fn get_cross_point_with_screen(
+    line_x: f64,
+    line_y: f64,
+    valid_degree: f64,
+    world_rect: &Rect,
+) -> Point {
     let gx = get_gx(valid_degree);
     let rad = valid_degree.to_radians();
     let sin = rad.sin();
@@ -54,19 +70,19 @@ pub fn get_cross_point_with_screen(line_x: f64, line_y: f64, valid_degree: f64) 
     };
     match gx {
         Gx::I => Point {
-            x: WORLD_WIDTH,
-            y: line_y + (WORLD_WIDTH - line_x) * tan_cot,
+            x: world_rect.width,
+            y: (world_rect.width - line_x).mul_add(tan_cot, line_y),
         },
         Gx::Ii => Point {
-            x: line_x + tan_cot * (WORLD_HEIGHT - line_y),
-            y: WORLD_HEIGHT,
+            x: tan_cot.mul_add(world_rect.height - line_y, line_x),
+            y: world_rect.height,
         },
         Gx::Iii => Point {
             x: 0.0,
-            y: line_y - line_x * tan_cot,
+            y: line_x.mul_add(-tan_cot, line_y),
         },
         Gx::Iv => Point {
-            x: line_x - line_y * tan_cot,
+            x: line_y.mul_add(-tan_cot, line_x),
             y: 0.0,
         },
     }
@@ -146,29 +162,29 @@ pub fn get_pos_point_vertical_in_line(
     match gx {
         Gx::I | Gx::Iii => {
             let tan = sin / cos;
-            let tmp = point_y - line_y - (point_x - line_x) * tan;
+            let tmp = (point_x - line_x).mul_add(-tan, point_y - line_y);
             Point {
-                x: point_x + tmp * cos * sin,
-                y: point_y - tmp * cos * cos,
+                x: (tmp * cos).mul_add(sin, point_x),
+                y: (tmp * cos).mul_add(-cos, point_y),
             }
         }
         Gx::Ii | Gx::Iv => {
             let cot = cos / sin;
-            let tmp = point_x - line_x - (point_y - line_y) * cot;
+            let tmp = (point_y - line_y).mul_add(-cot, point_x - line_x);
             Point {
-                x: point_x - tmp * sin * sin,
-                y: point_y + tmp * sin * cos,
+                x: (tmp * sin).mul_add(-sin, point_x),
+                y: (tmp * sin).mul_add(cos, point_y),
             }
         }
     }
 }
 
 fn dot_product(x1: f64, y1: f64, x2: f64, y2: f64) -> f64 {
-    x1 * x2 + y1 * y2
+    x1.mul_add(x2, y1 * y2)
 }
 
 fn get_projection_interval(rect: &Rect, axis_x: f64, axis_y: f64) -> (f64, f64) {
-    let center_proj = rect.cx * axis_x + rect.cy * axis_y;
+    let center_proj = rect.cx.mul_add(axis_x, rect.cy * axis_y);
     let ux = rect.rotate.cos();
     let uy = rect.rotate.sin();
     let vx = -uy;

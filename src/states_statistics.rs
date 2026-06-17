@@ -1,6 +1,6 @@
 use crate::{
     CHART_STATISTICS, FLATTEN_NOTE_INDEX, LINE_STATES,
-    states::{self, LineState, NoteState},
+    states::{self, LineData, NoteState},
 };
 
 pub struct NoteIndex {
@@ -19,7 +19,7 @@ pub struct ChartStatistics {
 
 impl Default for ChartStatistics {
     fn default() -> Self {
-        ChartStatistics {
+        Self {
             combo: 0,
             max_combo: 0,
             score: 0.0,
@@ -29,7 +29,7 @@ impl Default for ChartStatistics {
 }
 
 impl NoteIndex {
-    pub fn find_note<'a>(&self, line_states: &'a [LineState]) -> Option<&'a NoteState> {
+    pub fn find_note<'a>(&self, line_states: &'a [LineData]) -> Option<&'a NoteState> {
         line_states.get(self.index_in_line).and_then(|line_state| {
             (if self.above {
                 &line_state.notes_above_state
@@ -40,11 +40,11 @@ impl NoteIndex {
         })
     }
 
-    pub fn find_mut_line<'a>(&self, line_states: &'a mut [LineState]) -> Option<&'a mut LineState> {
+    pub fn find_mut_line<'a>(&self, line_states: &'a mut [LineData]) -> Option<&'a mut LineData> {
         line_states.get_mut(self.index_in_line)
     }
 
-    pub fn find_mut_note<'a>(&self, line_state: &'a mut LineState) -> Option<&'a mut NoteState> {
+    pub fn find_mut_note<'a>(&self, line_state: &'a mut LineData) -> Option<&'a mut NoteState> {
         (if self.above {
             &mut line_state.notes_above_state
         } else {
@@ -62,7 +62,7 @@ pub fn init_flatten_line_state() {
     });
 }
 
-fn internal_init_flatten_line_state(line_states: &[LineState], flatten_index: &mut Vec<NoteIndex>) {
+fn internal_init_flatten_line_state(line_states: &[LineData], flatten_index: &mut Vec<NoteIndex>) {
     let mut o = line_states
         .iter()
         .enumerate()
@@ -94,7 +94,7 @@ fn internal_init_flatten_line_state(line_states: &[LineState], flatten_index: &m
     *flatten_index = o;
 }
 
-pub(crate) fn refresh_chart_statistics() {
+pub fn refresh_chart_statistics() {
     LINE_STATES.with_borrow(|line_states| {
         FLATTEN_NOTE_INDEX.with_borrow(|flatten_index| {
             CHART_STATISTICS.with_borrow_mut(|chart_statistics| {
@@ -105,7 +105,7 @@ pub(crate) fn refresh_chart_statistics() {
 }
 
 fn internal_refresh_chart_statistics(
-    line_states: &[LineState],
+    line_states: &[LineData],
     flatten_index: &[NoteIndex],
     chart_statistics: &mut ChartStatistics,
 ) {
@@ -129,22 +129,19 @@ fn internal_refresh_chart_statistics(
     }
     let max_combo = combos.iter().max().copied().unwrap_or(0u32);
     let current_combo = combos.last().copied().unwrap_or(0u32);
-    let judge_results =
-        flatten_index
-            .iter()
-            .fold((0, 0), |score, it| match it.find_note(line_states) {
-                None => score,
-                Some(state) => match state.score {
-                    states::NoteScore::Perfect => (score.0 + 1, score.1),
-                    states::NoteScore::Good => (score.0, score.1 + 1),
-                    _ => score,
-                },
-            });
+    let judge_results = flatten_index.iter().fold((0, 0), |score, it| {
+        it.find_note(line_states)
+            .map_or(score, |state| match state.score {
+                states::NoteScore::Perfect => (score.0 + 1, score.1),
+                states::NoteScore::Good => (score.0, score.1 + 1),
+                _ => score,
+            })
+    });
     let total_notes = flatten_index.len();
     let accurate = (f64::from(judge_results.0) + f64::from(judge_results.1) * 0.65)
         / f64::from(total_notes as u32);
-    let score =
-        (f64::from(max_combo) / f64::from(total_notes as u32) * 100_000.0) + (accurate * 900_000.0);
+    let score = (f64::from(max_combo) / f64::from(total_notes as u32))
+        .mul_add(100_000.0, accurate * 900_000.0);
     *chart_statistics = ChartStatistics {
         combo: current_combo,
         max_combo,

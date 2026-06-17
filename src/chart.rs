@@ -79,10 +79,10 @@ impl TryFrom<i32> for NoteType {
 
     fn try_from(value: i32) -> Result<Self, Self::Error> {
         match value {
-            1 => Ok(NoteType::Tap),
-            2 => Ok(NoteType::Drag),
-            3 => Ok(NoteType::Hold),
-            4 => Ok(NoteType::Flick),
+            1 => Ok(Self::Tap),
+            2 => Ok(Self::Drag),
+            3 => Ok(Self::Hold),
+            4 => Ok(Self::Flick),
             _ => Err(()),
         }
     }
@@ -246,12 +246,12 @@ impl<'de> Deserialize<'de> for ChartRaw {
         let version = value
             .get("formatVersion")
             .and_then(serde_json::Value::as_i64)
-            .ok_or(serde::de::Error::missing_field("formatVersion"))?;
+            .ok_or_else(|| serde::de::Error::missing_field("formatVersion"))?;
         match version {
-            1 => Ok(ChartRaw::V1(
+            1 => Ok(Self::V1(
                 serde_json::from_value::<ChartV1>(value).map_err(serde::de::Error::custom)?,
             )),
-            3 => Ok(ChartRaw::V3(
+            3 => Ok(Self::V3(
                 serde_json::from_value::<Chart>(value).map_err(serde::de::Error::custom)?,
             )),
             _ => Err(serde::de::Error::custom(format!(
@@ -266,7 +266,7 @@ impl ChartRaw {
     #[must_use]
     pub fn convert_to_v3(self) -> Chart {
         match self {
-            ChartRaw::V1(v1) => Chart {
+            Self::V1(v1) => Chart {
                 offset: v1.offset,
                 judge_line_list: v1
                     .judge_line_list
@@ -274,7 +274,7 @@ impl ChartRaw {
                     .map(std::convert::Into::into)
                     .collect(),
             },
-            ChartRaw::V3(v3) => v3,
+            Self::V3(v3) => v3,
         }
     }
 }
@@ -299,7 +299,7 @@ impl From<JudgeLineV1> for JudgeLine {
                 }
             })
             .collect();
-        JudgeLine {
+        Self {
             bpm: value.bpm,
             notes_above: value.notes_above,
             notes_below: value.notes_below,

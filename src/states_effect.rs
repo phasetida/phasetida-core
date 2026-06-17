@@ -29,7 +29,7 @@ pub struct SoundEffect {
 
 impl Default for HitEffect {
     fn default() -> Self {
-        HitEffect {
+        Self {
             enable: false,
             x: 0.0,
             y: 0.0,
@@ -41,7 +41,7 @@ impl Default for HitEffect {
 
 impl Default for SplashEffect {
     fn default() -> Self {
-        SplashEffect {
+        Self {
             enable: false,
             x: 0.0,
             y: 0.0,
@@ -59,9 +59,9 @@ pub struct Rng {
 }
 
 impl Rng {
-    pub fn new(seed: u64) -> Rng {
+    pub const fn new(seed: u64) -> Self {
         let seed = if seed == 0 { 0xdead_beef } else { seed };
-        Rng { state: seed }
+        Self { state: seed }
     }
 
     pub fn next(&mut self) -> f64 {
@@ -73,17 +73,17 @@ impl Rng {
     }
 
     pub fn range(&mut self, min: f64, max: f64) -> f64 {
-        min + (max - min) * self.next()
+        (max - min).mul_add(self.next(), min)
     }
 }
 
 const RATE: f64 = 2.0;
 
-pub(crate) fn tick_effect(delta_time_in_second: f64) {
+pub fn tick_effect(delta_time_in_second: f64) {
     HIT_EFFECT_POOL.with_borrow_mut(|pool| {
         for it in pool.iter_mut() {
             if it.enable {
-                it.progress += delta_time_in_second.max(0.0) * RATE;
+                it.progress = delta_time_in_second.max(0.0).mul_add(RATE, it.progress);
                 if it.progress >= 1.0 {
                     it.enable = false;
                 }
@@ -93,14 +93,14 @@ pub(crate) fn tick_effect(delta_time_in_second: f64) {
     SPLASH_EFFECT_POOL.with_borrow_mut(|pool| {
         for it in pool.iter_mut() {
             if it.enable {
-                it.progress += delta_time_in_second.max(0.0) * RATE;
+                it.progress = delta_time_in_second.max(0.0).mul_add(RATE, it.progress);
                 if it.progress >= 1.0 {
                     it.enable = false;
                     continue;
                 }
                 it.speed -= (it.speed * 7.0 * delta_time_in_second.max(0.0)).max(0.0);
-                it.x += it.speed * it.x_vec * delta_time_in_second.max(0.0);
-                it.y += it.speed * it.y_vec * delta_time_in_second.max(0.0);
+                it.x = (it.speed * it.x_vec).mul_add(delta_time_in_second.max(0.0), it.x);
+                it.y = (it.speed * it.y_vec).mul_add(delta_time_in_second.max(0.0), it.y);
             }
         }
     });

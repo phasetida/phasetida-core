@@ -9,7 +9,7 @@ pub struct TouchInfo {
 
 impl Default for TouchInfo {
     fn default() -> Self {
-        TouchInfo {
+        Self {
             enable: false,
             x: 0.0,
             y: 0.0,
@@ -22,15 +22,15 @@ impl Default for TouchInfo {
 
 impl TouchInfo {
     pub fn length(&self) -> f32 {
-        ((self.x - self.init_x).powi(2) + (self.y - self.init_y).powi(2)).sqrt()
+        (self.x - self.init_x).hypot(self.y - self.init_y)
     }
 
-    pub fn reset_length(&mut self) {
+    pub const fn reset_length(&mut self) {
         self.init_x = self.x;
         self.init_y = self.y;
     }
 
-    pub fn touch_down(&mut self, x: f32, y: f32) {
+    pub const fn touch_down(&mut self, x: f32, y: f32) {
         self.enable = true;
         self.touch_valid = true;
         self.init_x = x;
@@ -38,12 +38,12 @@ impl TouchInfo {
         self.touch_move(x, y);
     }
 
-    pub fn touch_move(&mut self, x: f32, y: f32) {
+    pub const fn touch_move(&mut self, x: f32, y: f32) {
         self.x = x;
         self.y = y;
     }
 
-    pub fn touch_up(&mut self) {
+    pub const fn touch_up(&mut self) {
         self.enable = false;
     }
 }
