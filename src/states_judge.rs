@@ -2,13 +2,13 @@ use crate::{
     FLATTEN_NOTE_INDEX, LINE_STATES, TOUCH_STATES,
     chart::{Note, NoteType},
     input::TouchInfo,
-    math::{self, Point},
-    states::{LineState, NoteScore, NoteState},
+    math::{self, Point, Rect},
+    states::{LineData, LineState, NoteScore, NoteState},
     states_effect,
     states_statistics::NoteIndex,
 };
 
-pub fn tick_lines_judge(delta_time_in_second: f64, auto: bool) -> bool {
+pub fn tick_lines_judge(delta_time_in_second: f64, auto: bool, world_rect: &Rect) -> bool {
     states_effect::clear_sound_effect();
     TOUCH_STATES.with_borrow_mut(|touches| {
         LINE_STATES.with_borrow_mut(|lines| {
@@ -19,6 +19,7 @@ pub fn tick_lines_judge(delta_time_in_second: f64, auto: bool) -> bool {
                     touches.as_mut(),
                     lines.as_mut(),
                     auto,
+                    world_rect,
                 )
             })
         })
@@ -29,8 +30,9 @@ fn tick_line_judge(
     delta_time_in_second: f64,
     flatten_note_index: &[NoteIndex],
     touches: &mut [TouchInfo],
-    lines: &mut [LineState],
+    lines: &mut [LineData],
     auto: bool,
+    world_rect: &Rect,
 ) -> bool {
     let mut judged = false;
     for note_index in flatten_note_index {
@@ -41,9 +43,7 @@ fn tick_line_judge(
             continue;
         }
         let current_tick = line.tick_time;
-        let line_x = line.x;
-        let line_y = line.y;
-        let line_rotate = line.rotate;
+        let state = line.line_state;
         let bpm = line.bpm;
         let Some(note) = note_index.find_mut_note(line) else {
             continue;
@@ -56,52 +56,32 @@ fn tick_line_judge(
                     current_tick,
                     note,
                     touches,
-                    line_x,
-                    line_y,
-                    line_rotate,
+                    &state,
                     bpm,
+                    world_rect,
                 ),
-                _ => tick_normal_note_auto(current_tick, note, line_x, line_y, line_rotate, bpm),
+                _ => tick_normal_note_auto(current_tick, note, &state, bpm, world_rect),
             }
         } else {
             match note_type {
-                NoteType::Tap => tick_tap_note(
-                    current_tick,
-                    note,
-                    touches,
-                    line_x,
-                    line_y,
-                    line_rotate,
-                    bpm,
-                ),
-                NoteType::Drag => tick_drag_note(
-                    current_tick,
-                    note,
-                    touches,
-                    line_x,
-                    line_y,
-                    line_rotate,
-                    bpm,
-                ),
+                NoteType::Tap => {
+                    tick_tap_note(current_tick, note, touches, &state, bpm, world_rect)
+                }
+                NoteType::Drag => {
+                    tick_drag_note(current_tick, note, touches, &state, bpm, world_rect)
+                }
                 NoteType::Hold => tick_hold_note(
                     delta_time_in_second,
                     current_tick,
                     note,
                     touches,
-                    line_x,
-                    line_y,
-                    line_rotate,
+                    &state,
                     bpm,
+                    world_rect,
                 ),
-                NoteType::Flick => tick_flick_note(
-                    current_tick,
-                    note,
-                    touches,
-                    line_x,
-                    line_y,
-                    line_rotate,
-                    bpm,
-                ),
+                NoteType::Flick => {
+                    tick_flick_note(current_tick, note, touches, &state, bpm, world_rect)
+                }
             }
         };
         judged |= local_judged;
@@ -115,9 +95,7 @@ fn tick_line_judge(
 }
 
 fn check_point_in_judge_range(
-    line_x: f64,
-    line_y: f64,
-    line_rotate: f64,
+    line_state: &LineState,
     Note {
         position_x: note_position_x,
         ..
@@ -127,7 +105,14 @@ fn check_point_in_judge_range(
         y: touch_y,
         ..
     }: &TouchInfo,
+    world_rect: &Rect,
 ) -> (bool, (f64, f64)) {
+    let LineState {
+        x: line_x,
+        y: line_y,
+        rotate: line_rotate,
+        ..
+    } = *line_state;
     let Point {
         x: root_x,
         y: root_y,
@@ -135,7 +120,7 @@ fn check_point_in_judge_range(
         line_x,
         line_y,
         line_rotate,
-        *note_position_x * math::UNIT_WIDTH,
+        *note_position_x * world_rect.get_unit_width(),
     );
     let Point {
         x: touch_root_x,
@@ -188,11 +173,16 @@ fn create_splash(seed: f64, x: f64, y: f64, note_score: NoteScore) {
 fn tick_normal_note_auto(
     current_tick: f64,
     note: &mut NoteState,
-    line_x: f64,
-    line_y: f64,
-    line_rotate: f64,
+    line_state: &LineState,
     bpm: f64,
+    world_rect: &Rect,
 ) -> bool {
+    let LineState {
+        x: line_x,
+        y: line_y,
+        rotate: line_rotate,
+        ..
+    } = *line_state;
     if note.score != NoteScore::None {
         return false;
     }
@@ -205,7 +195,7 @@ fn tick_normal_note_auto(
             line_x,
             line_y,
             line_rotate,
-            note.note.position_x * math::UNIT_WIDTH,
+            note.note.position_x * world_rect.get_unit_width(),
         );
         note.score = NoteScore::Perfect;
         create_splash(current_tick, root_x, root_y, NoteScore::Perfect);
@@ -219,11 +209,16 @@ fn tick_flick_note(
     current_tick: f64,
     note: &mut NoteState,
     touches: &mut [TouchInfo],
-    line_x: f64,
-    line_y: f64,
-    line_rotate: f64,
+    line_state: &LineState,
     bpm: f64,
+    world_rect: &Rect,
 ) -> bool {
+    let LineState {
+        x: line_x,
+        y: line_y,
+        rotate: line_rotate,
+        ..
+    } = *line_state;
     if note.score != NoteScore::None {
         return false;
     }
@@ -240,7 +235,7 @@ fn tick_flick_note(
                 line_x,
                 line_y,
                 line_rotate,
-                note.note.position_x * math::UNIT_WIDTH,
+                note.note.position_x * world_rect.get_unit_width(),
             );
             note.score = NoteScore::Perfect;
             create_splash(current_tick, root_x, root_y, NoteScore::Perfect);
@@ -258,7 +253,7 @@ fn tick_flick_note(
             continue;
         }
         let (is_in_judge_range, _) =
-            check_point_in_judge_range(line_x, line_y, line_rotate, &note.note, touch);
+            check_point_in_judge_range(line_state, &note.note, touch, world_rect);
         if is_in_judge_range && touch.length() >= 50.0 {
             note.extra_score = NoteScore::Perfect;
             touch.reset_length();
@@ -268,16 +263,14 @@ fn tick_flick_note(
     false
 }
 
-#[allow(clippy::too_many_arguments)]
 fn tick_hold_note_auto(
     delta_time_in_second: f64,
     current_tick: f64,
     note: &mut NoteState,
     touches: &[TouchInfo],
-    line_x: f64,
-    line_y: f64,
-    line_rotate: f64,
+    line_state: &LineState,
     bpm: f64,
+    world_rect: &Rect,
 ) -> bool {
     if note.score != NoteScore::None {
         return false;
@@ -292,11 +285,10 @@ fn tick_hold_note_auto(
         current_tick,
         note,
         touches,
-        line_x,
-        line_y,
-        line_rotate,
+        line_state,
         bpm,
         true,
+        world_rect,
     )
     .1
 }
@@ -307,12 +299,17 @@ fn tick_hold_note_common(
     current_tick: f64,
     note: &mut NoteState,
     touches: &[TouchInfo],
-    line_x: f64,
-    line_y: f64,
-    line_rotate: f64,
+    line_state: &LineState,
     bpm: f64,
     auto: bool,
+    world_rect: &Rect,
 ) -> (bool, bool) {
+    let LineState {
+        x: line_x,
+        y: line_y,
+        rotate: line_rotate,
+        ..
+    } = *line_state;
     if note.extra_score != NoteScore::None {
         let seconds_per_tick = 60.0 / bpm / 32.0;
         let delta_tick = delta_time_in_second / seconds_per_tick;
@@ -326,12 +323,12 @@ fn tick_hold_note_common(
                 line_x,
                 line_y,
                 line_rotate,
-                note.note.position_x * math::UNIT_WIDTH,
+                note.note.position_x * world_rect.get_unit_width(),
             );
             if auto
                 || touches.iter().any(|touch| {
                     let (is_in_judge_range, _) =
-                        check_point_in_judge_range(line_x, line_y, line_rotate, &note.note, touch);
+                        check_point_in_judge_range(line_state, &note.note, touch, world_rect);
                     is_in_judge_range && touch.enable
                 })
                 || note.note.hold_time + f64::from(note.note.time) - 16.0 <= current_tick
@@ -356,16 +353,14 @@ fn tick_hold_note_common(
     (false, false)
 }
 
-#[allow(clippy::too_many_arguments)]
 fn tick_hold_note(
     delta_time_in_second: f64,
     current_tick: f64,
     note: &mut NoteState,
     touches: &mut [TouchInfo],
-    line_x: f64,
-    line_y: f64,
-    line_rotate: f64,
+    line_state: &LineState,
     bpm: f64,
+    world_rect: &Rect,
 ) -> bool {
     if note.score != NoteScore::None {
         return false;
@@ -375,11 +370,10 @@ fn tick_hold_note(
         current_tick,
         note,
         touches,
-        line_x,
-        line_y,
-        line_rotate,
+        line_state,
         bpm,
         false,
+        world_rect,
     );
     if hold {
         return hold_judged;
@@ -397,7 +391,7 @@ fn tick_hold_note(
             continue;
         }
         let (is_in_judge_range, _) =
-            check_point_in_judge_range(line_x, line_y, line_rotate, &note.note, touch);
+            check_point_in_judge_range(line_state, &note.note, touch, world_rect);
         if is_in_judge_range && touch.touch_valid {
             if judge_result != NoteScore::Perfect && judge_result != NoteScore::Good {
                 continue;
@@ -415,11 +409,16 @@ fn tick_drag_note(
     current_tick: f64,
     note: &mut NoteState,
     touches: &mut [TouchInfo],
-    line_x: f64,
-    line_y: f64,
-    line_rotate: f64,
+    line_state: &LineState,
     bpm: f64,
+    world_rect: &Rect,
 ) -> bool {
+    let LineState {
+        x: line_x,
+        y: line_y,
+        rotate: line_rotate,
+        ..
+    } = *line_state;
     if note.score != NoteScore::None {
         return false;
     }
@@ -436,7 +435,7 @@ fn tick_drag_note(
                 line_x,
                 line_y,
                 line_rotate,
-                note.note.position_x * math::UNIT_WIDTH,
+                note.note.position_x * world_rect.get_unit_width(),
             );
             note.score = NoteScore::Perfect;
             states_effect::new_sound_effect(NoteType::Drag);
@@ -454,7 +453,7 @@ fn tick_drag_note(
             continue;
         }
         let (is_in_judge_range, _) =
-            check_point_in_judge_range(line_x, line_y, line_rotate, &note.note, touch);
+            check_point_in_judge_range(line_state, &note.note, touch, world_rect);
         if is_in_judge_range {
             note.extra_score = NoteScore::Perfect;
             return false;
@@ -467,10 +466,9 @@ fn tick_tap_note(
     current_tick: f64,
     note: &mut NoteState,
     touches: &mut [TouchInfo],
-    line_x: f64,
-    line_y: f64,
-    line_rotate: f64,
+    line_state: &LineState,
     bpm: f64,
+    world_rect: &Rect,
 ) -> bool {
     if note.score != NoteScore::None {
         return false;
@@ -489,7 +487,7 @@ fn tick_tap_note(
             continue;
         }
         let (is_in_judge_range, (root_x, root_y)) =
-            check_point_in_judge_range(line_x, line_y, line_rotate, &note.note, touch);
+            check_point_in_judge_range(line_state, &note.note, touch, world_rect);
         if is_in_judge_range && touch.touch_valid {
             touch.touch_valid = false;
             note.score = judge_result;

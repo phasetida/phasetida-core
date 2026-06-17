@@ -1,6 +1,6 @@
 use crate::{
     CHART_STATISTICS, FLATTEN_NOTE_INDEX, LINE_STATES,
-    states::{self, LineState, NoteState},
+    states::{self, LineData, NoteState},
 };
 
 pub struct NoteIndex {
@@ -29,7 +29,7 @@ impl Default for ChartStatistics {
 }
 
 impl NoteIndex {
-    pub fn find_note<'a>(&self, line_states: &'a [LineState]) -> Option<&'a NoteState> {
+    pub fn find_note<'a>(&self, line_states: &'a [LineData]) -> Option<&'a NoteState> {
         line_states.get(self.index_in_line).and_then(|line_state| {
             (if self.above {
                 &line_state.notes_above_state
@@ -40,11 +40,11 @@ impl NoteIndex {
         })
     }
 
-    pub fn find_mut_line<'a>(&self, line_states: &'a mut [LineState]) -> Option<&'a mut LineState> {
+    pub fn find_mut_line<'a>(&self, line_states: &'a mut [LineData]) -> Option<&'a mut LineData> {
         line_states.get_mut(self.index_in_line)
     }
 
-    pub fn find_mut_note<'a>(&self, line_state: &'a mut LineState) -> Option<&'a mut NoteState> {
+    pub fn find_mut_note<'a>(&self, line_state: &'a mut LineData) -> Option<&'a mut NoteState> {
         (if self.above {
             &mut line_state.notes_above_state
         } else {
@@ -62,7 +62,7 @@ pub fn init_flatten_line_state() {
     });
 }
 
-fn internal_init_flatten_line_state(line_states: &[LineState], flatten_index: &mut Vec<NoteIndex>) {
+fn internal_init_flatten_line_state(line_states: &[LineData], flatten_index: &mut Vec<NoteIndex>) {
     let mut o = line_states
         .iter()
         .enumerate()
@@ -105,7 +105,7 @@ pub fn refresh_chart_statistics() {
 }
 
 fn internal_refresh_chart_statistics(
-    line_states: &[LineState],
+    line_states: &[LineData],
     flatten_index: &[NoteIndex],
     chart_statistics: &mut ChartStatistics,
 ) {

@@ -2,10 +2,11 @@ use std::{collections::HashSet, default::Default};
 
 use crate::{
     CHART_STATISTICS, FLATTEN_NOTE_INDEX, HIT_EFFECT_POOL, LINE_STATES, SOUND_POOL,
-    SPLASH_EFFECT_POOL, TOUCH_STATES,
+    SPLASH_EFFECT_POOL, TOUCH_STATES, WORLD_RECT,
     chart::{self, ChartRaw, JudgeLine, WithTimeRange},
     input::TouchInfo,
-    states::{LineState, Metadata, NoteState, get_seconds_per_tick},
+    math::Rect,
+    states::{LineData, LineState, Metadata, NoteState, get_seconds_per_tick},
     states_effect::{HitEffect, SoundEffect, SplashEffect},
     states_statistics::{self, ChartStatistics},
 };
@@ -38,7 +39,7 @@ pub fn init_line_states(chart_raw: chart::ChartRaw) -> Metadata {
         })
         .collect::<Vec<_>>();
     let metadata = LINE_STATES.with_borrow_mut(|states| {
-        *states = std::array::from_fn(|_| LineState::default());
+        *states = std::array::from_fn(|_| LineData::default());
         let available_len = chart.judge_line_list.len();
         for (i, it) in chart.judge_line_list.into_iter().enumerate() {
             let JudgeLine {
@@ -50,9 +51,12 @@ pub fn init_line_states(chart_raw: chart::ChartRaw) -> Metadata {
                 rotate_events,
                 alpha_events,
             } = it;
-            states[i] = LineState {
-                enable: true,
-                bpm,
+            states[i] = LineData {
+                line_state: LineState {
+                    enable: true,
+                    bpm,
+                    ..Default::default()
+                },
                 move_events,
                 alpha_events,
                 speed_events,
@@ -73,7 +77,6 @@ pub fn init_line_states(chart_raw: chart::ChartRaw) -> Metadata {
                         ..Default::default()
                     })
                     .collect(),
-                ..Default::default()
             }
         }
         states
@@ -91,10 +94,17 @@ pub fn init_line_states(chart_raw: chart::ChartRaw) -> Metadata {
     metadata
 }
 
+/// Initialize world rect from width and height
+pub fn init_world_rect(width: f64, height: f64) {
+    WORLD_RECT.with_borrow_mut(|world_height| {
+        *world_height = Rect::centered(width, height);
+    });
+}
+
 /// Clear the states of lines
 pub fn clear_states() {
     FLATTEN_NOTE_INDEX.with_borrow_mut(std::vec::Vec::clear);
-    LINE_STATES.with_borrow_mut(|it| *it = std::array::from_fn(|_| LineState::default()));
+    LINE_STATES.with_borrow_mut(|it| *it = std::array::from_fn(|_| LineData::default()));
     TOUCH_STATES.with_borrow_mut(|it| *it = std::array::from_fn(|_| TouchInfo::default()));
     HIT_EFFECT_POOL.with_borrow_mut(|it| *it = std::array::from_fn(|_| HitEffect::default()));
     SPLASH_EFFECT_POOL.with_borrow_mut(|it| *it = std::array::from_fn(|_| SplashEffect::default()));
@@ -102,7 +112,7 @@ pub fn clear_states() {
     SOUND_POOL.with_borrow_mut(|it| *it = SoundEffect::default());
 }
 
-fn process_highlight(judge_line_states: &mut [LineState]) {
+fn process_highlight(judge_line_states: &mut [LineData]) {
     let mut set1 = HashSet::<i32>::new();
     let mut set2 = HashSet::<i32>::new();
     for it in judge_line_states.iter() {
@@ -143,7 +153,7 @@ fn process_highlight(judge_line_states: &mut [LineState]) {
     }
 }
 
-fn get_estimated_length(state: &[LineState]) -> f64 {
+fn get_estimated_length(state: &[LineData]) -> f64 {
     let note_max_time = state.iter().fold(0.0, |last, it| {
         let seconds_per_tick = get_seconds_per_tick(it.bpm);
         let get_time = |note: &NoteState| -> f64 {

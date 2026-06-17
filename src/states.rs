@@ -1,11 +1,25 @@
+use std::ops::{Deref, DerefMut};
+
 use serde::Serialize;
 
 use crate::{
-    LINE_STATES,
+    LINE_STATES, WORLD_RECT,
     chart::{self},
     states_effect, states_judge, states_lines, states_statistics,
 };
 
+#[derive(Default)]
+pub struct LineData {
+    pub line_state: LineState,
+    pub notes_above_state: Vec<NoteState>,
+    pub notes_below_state: Vec<NoteState>,
+    pub speed_events: Vec<chart::Event1>,
+    pub move_events: Vec<chart::Event4>,
+    pub rotate_events: Vec<chart::Event2>,
+    pub alpha_events: Vec<chart::Event2>,
+}
+
+#[derive(Debug, Clone, Copy)]
 pub struct LineState {
     pub enable: bool,
     pub x: f64,
@@ -19,13 +33,41 @@ pub struct LineState {
     pub event_move_index_cache: i64,
     pub event_rotate_index_cache: i64,
     pub event_alpha_index_cache: i64,
-    pub notes_above_state: Vec<NoteState>,
-    pub notes_below_state: Vec<NoteState>,
-    pub speed_events: Vec<chart::Event1>,
-    pub move_events: Vec<chart::Event4>,
-    pub rotate_events: Vec<chart::Event2>,
-    pub alpha_events: Vec<chart::Event2>,
     pub bpm: f64,
+}
+
+impl Default for LineState {
+    fn default() -> Self {
+        Self {
+            enable: false,
+            x: 0.0,
+            y: 0.0,
+            rotate: 0.0,
+            alpha: 0.0,
+            speed: 1.0,
+            line_y: 0.0,
+            tick_time: 0.0,
+            event_speed_index_cache: 0,
+            event_move_index_cache: 0,
+            event_rotate_index_cache: 0,
+            event_alpha_index_cache: 0,
+            bpm: 0.0,
+        }
+    }
+}
+
+impl Deref for LineData {
+    type Target = LineState;
+
+    fn deref(&self) -> &Self::Target {
+        &self.line_state
+    }
+}
+
+impl DerefMut for LineData {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.line_state
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -56,32 +98,6 @@ pub struct Metadata {
 
     /// The format version of the chart
     pub format_version: i32,
-}
-
-impl Default for LineState {
-    fn default() -> Self {
-        Self {
-            enable: false,
-            x: 0.0,
-            y: 0.0,
-            rotate: 0.0,
-            alpha: 0.0,
-            speed: 1.0,
-            line_y: 0.0,
-            tick_time: 0.0,
-            event_speed_index_cache: 0,
-            event_move_index_cache: 0,
-            event_rotate_index_cache: 0,
-            event_alpha_index_cache: 0,
-            notes_above_state: vec![],
-            notes_below_state: vec![],
-            speed_events: vec![],
-            move_events: vec![],
-            alpha_events: vec![],
-            rotate_events: vec![],
-            bpm: 0.0,
-        }
-    }
 }
 
 impl Default for NoteState {
@@ -138,9 +154,11 @@ pub fn reset_note_state(before_time_in_second: f64) {
 
 /// Ticking all states, including lines, judges and chart statistics
 pub fn tick_all(time_in_second: f64, delta_time_in_second: f64, auto: bool) {
-    states_lines::tick_lines(time_in_second);
-    states_effect::tick_effect(delta_time_in_second);
-    if states_judge::tick_lines_judge(delta_time_in_second, auto) {
-        states_statistics::refresh_chart_statistics();
-    }
+    WORLD_RECT.with_borrow(|world_rect| {
+        states_lines::tick_lines(time_in_second, world_rect);
+        states_effect::tick_effect(delta_time_in_second);
+        if states_judge::tick_lines_judge(delta_time_in_second, auto, world_rect) {
+            states_statistics::refresh_chart_statistics();
+        }
+    });
 }

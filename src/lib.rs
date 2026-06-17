@@ -32,12 +32,13 @@ mod states_statistics;
 thread_local! {
     pub(crate) static DRAW_IMAGE_OFFSET:RefCell<draw::DrawImageOffset> = RefCell::new(draw::DrawImageOffset::default());
     pub(crate) static FLATTEN_NOTE_INDEX:RefCell<Vec<states_statistics::NoteIndex>>= const{RefCell::new(Vec::<_>::new())};
-    pub(crate) static LINE_STATES: RefCell<[states::LineState;50]> = RefCell::new(std::array::from_fn(|_|states::LineState::default()));
+    pub(crate) static LINE_STATES: RefCell<[states::LineData;50]> = RefCell::new(std::array::from_fn(|_|states::LineData::default()));
     pub(crate) static TOUCH_STATES: RefCell<[input::TouchInfo; 30]> = RefCell::new(std::array::from_fn(|_|input::TouchInfo::default()));
     pub(crate) static HIT_EFFECT_POOL: RefCell<[states_effect::HitEffect; 64]> = RefCell::new(std::array::from_fn(|_|states_effect::HitEffect::default()));
     pub(crate) static SPLASH_EFFECT_POOL : RefCell<[states_effect::SplashEffect;256]> = RefCell::new(std::array::from_fn(|_|states_effect::SplashEffect::default()));
     pub(crate) static CHART_STATISTICS: RefCell<states_statistics::ChartStatistics> = RefCell::new(states_statistics::ChartStatistics::default());
     pub(crate) static SOUND_POOL: RefCell<states_effect::SoundEffect> = RefCell::new(states_effect::SoundEffect::default());
+    pub(crate) static WORLD_RECT: RefCell<math::Rect> = RefCell::new(math::Rect::world_default());
 }
 
 pub use chart::Chart;
@@ -51,6 +52,7 @@ pub use draw::process_state_to_drawable;
 pub use states_initializing::clear_states;
 pub use states_initializing::init_line_states;
 pub use states_initializing::init_line_states_from_json;
+pub use states_initializing::init_world_rect;
 
 pub use states_input::clear_touch;
 pub use states_input::set_touch_down;

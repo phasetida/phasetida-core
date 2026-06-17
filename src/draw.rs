@@ -1,13 +1,13 @@
 use crate::chart::{Note, NoteType};
-use crate::math::{self, Point};
+use crate::math::{self, Point, Rect};
 use crate::renders::{
     self, Dense, RendClickEffect, RendNote, RendPoint, RendSound, RendSplashEffect, RendStatistics,
 };
-use crate::states::{LineState, NoteScore, NoteState};
+use crate::states::{LineData, LineState, NoteScore, NoteState};
 use crate::states_effect::{HitEffect, SoundEffect, SplashEffect};
 use crate::{
     CHART_STATISTICS, DRAW_IMAGE_OFFSET, HIT_EFFECT_POOL, LINE_STATES, SOUND_POOL,
-    SPLASH_EFFECT_POOL, TOUCH_STATES,
+    SPLASH_EFFECT_POOL, TOUCH_STATES, WORLD_RECT,
 };
 
 #[allow(clippy::struct_field_names)]
@@ -61,49 +61,51 @@ pub fn load_image_offset(
 ///
 /// The state is written by calling `write` on the provided `BufferWithCursor`.
 pub fn process_state_to_drawable(wrapped_buffer: &mut impl BufferWithCursor) {
-    CHART_STATISTICS.with_borrow(|statistics| {
-        wrapped_buffer.write(
-            RendStatistics {
-                rend_type: 5,
-                combo: statistics.combo,
-                max_combo: statistics.max_combo,
-                score: statistics.score as f32,
-                accurate: statistics.accurate as f32,
-            }
-            .to_bytes(),
-        );
-    });
-    LINE_STATES.with_borrow(|states| {
-        DRAW_IMAGE_OFFSET.with_borrow(|offset| {
-            for it in states {
-                write_line(wrapped_buffer, it);
-            }
-            write_notes(wrapped_buffer, states.as_ref(), offset);
-        });
-    });
-    HIT_EFFECT_POOL.with_borrow(|effects| {
-        write_click_effects(wrapped_buffer, effects);
-    });
-    SPLASH_EFFECT_POOL.with_borrow(|effects| {
-        write_splash_effects(wrapped_buffer, effects);
-    });
-    SOUND_POOL.with_borrow(|effects| write_sound_effects(wrapped_buffer, effects));
-    TOUCH_STATES.with_borrow(|touches| {
-        for it in touches {
-            if !it.enable {
-                continue;
-            }
+    WORLD_RECT.with_borrow(|world_rect| {
+        CHART_STATISTICS.with_borrow(|statistics| {
             wrapped_buffer.write(
-                RendPoint {
-                    rend_type: 4,
-                    x: it.x,
-                    y: it.y,
+                RendStatistics {
+                    rend_type: 5,
+                    combo: statistics.combo,
+                    max_combo: statistics.max_combo,
+                    score: statistics.score as f32,
+                    accurate: statistics.accurate as f32,
                 }
                 .to_bytes(),
             );
-        }
+        });
+        LINE_STATES.with_borrow(|states| {
+            DRAW_IMAGE_OFFSET.with_borrow(|offset| {
+                for it in states {
+                    write_line(wrapped_buffer, it, world_rect);
+                }
+                write_notes(wrapped_buffer, states.as_ref(), offset, world_rect);
+            });
+        });
+        HIT_EFFECT_POOL.with_borrow(|effects| {
+            write_click_effects(wrapped_buffer, effects);
+        });
+        SPLASH_EFFECT_POOL.with_borrow(|effects| {
+            write_splash_effects(wrapped_buffer, effects);
+        });
+        SOUND_POOL.with_borrow(|effects| write_sound_effects(wrapped_buffer, effects));
+        TOUCH_STATES.with_borrow(|touches| {
+            for it in touches {
+                if !it.enable {
+                    continue;
+                }
+                wrapped_buffer.write(
+                    RendPoint {
+                        rend_type: 4,
+                        x: it.x,
+                        y: it.y,
+                    }
+                    .to_bytes(),
+                );
+            }
+        });
+        wrapped_buffer.write(&[0]);
     });
-    wrapped_buffer.write(&[0]);
 }
 
 fn write_sound_effects(wrapped_buffer: &mut impl BufferWithCursor, states: &SoundEffect) {
@@ -154,24 +156,33 @@ fn write_click_effects(wrapped_buffer: &mut impl BufferWithCursor, states: &[Hit
     }
 }
 
-fn write_line(wrapped_buffer: &mut impl BufferWithCursor, state: &LineState) {
+fn write_line(wrapped_buffer: &mut impl BufferWithCursor, state: &LineData, world_rect: &Rect) {
     fn eq(a: f64, b: f64) -> bool {
         (a - b).abs() <= f64::EPSILON
     }
-    let p1 = math::get_cross_point_with_screen(state.x, state.y, math::fix_degree(state.rotate));
-    let p2 =
-        math::get_cross_point_with_screen(state.x, state.y, math::fix_degree(state.rotate + 180.0));
+    let p1 = math::get_cross_point_with_screen(
+        state.x,
+        state.y,
+        math::fix_degree(state.rotate),
+        world_rect,
+    );
+    let p2 = math::get_cross_point_with_screen(
+        state.x,
+        state.y,
+        math::fix_degree(state.rotate + 180.0),
+        world_rect,
+    );
     if state.alpha <= 0.0 {
         return;
     }
-    if (((eq(p1.x, 0.0) && eq(p2.x, math::WORLD_WIDTH))
-        || (eq(p2.x, 0.0) && eq(p1.x, math::WORLD_WIDTH)))
+    if (((eq(p1.x, 0.0) && eq(p2.x, world_rect.width))
+        || (eq(p2.x, 0.0) && eq(p1.x, world_rect.width)))
         && ((p1.y <= 0.0 && p2.y <= 0.0)
-            || (p1.y >= math::WORLD_HEIGHT && p2.y >= math::WORLD_HEIGHT)))
-        || (((eq(p1.y, 0.0) && eq(p2.y, math::WORLD_HEIGHT))
-            || (eq(p2.y, 0.0) && eq(p1.y, math::WORLD_HEIGHT)))
+            || (p1.y >= world_rect.height && p2.y >= world_rect.height)))
+        || (((eq(p1.y, 0.0) && eq(p2.y, world_rect.height))
+            || (eq(p2.y, 0.0) && eq(p1.y, world_rect.height)))
             && ((p1.x <= 0.0 && p2.x <= 0.0)
-                || (p1.x >= math::WORLD_WIDTH && p2.x >= math::WORLD_WIDTH)))
+                || (p1.x >= world_rect.width && p2.x >= world_rect.width)))
     {
         return;
     }
@@ -189,13 +200,14 @@ fn write_line(wrapped_buffer: &mut impl BufferWithCursor, state: &LineState) {
 
 fn write_notes(
     wrapped_buffer: &mut impl BufferWithCursor,
-    states: &[LineState],
+    states: &[LineData],
     offset: &DrawImageOffset,
+    world_rect: &Rect,
 ) {
     let notes = states
         .iter()
         .fold((Vec::new(), Vec::new()), |(v1, v2), it| {
-            process_notes(it, offset, v1, v2)
+            process_notes(it, offset, world_rect, v1, v2)
         });
     notes
         .1
@@ -205,8 +217,9 @@ fn write_notes(
 }
 
 fn process_notes(
-    state: &LineState,
+    state: &LineData,
     offset: &DrawImageOffset,
+    world_rect: &Rect,
     mut vec: Vec<RendNote>,
     mut hold_vec: Vec<RendNote>,
 ) -> (Vec<RendNote>, Vec<RendNote>) {
@@ -215,6 +228,7 @@ fn process_notes(
         offset,
         &state.notes_above_state,
         false,
+        world_rect,
         &mut vec,
         &mut hold_vec,
     );
@@ -223,6 +237,7 @@ fn process_notes(
         offset,
         &state.notes_below_state,
         true,
+        world_rect,
         &mut vec,
         &mut hold_vec,
     );
@@ -238,6 +253,7 @@ fn process_notes_half(
     offset: &DrawImageOffset,
     notes: &[NoteState],
     reverse: bool,
+    world_rect: &Rect,
     out: &mut Vec<RendNote>,
     out_hold: &mut Vec<RendNote>,
 ) {
@@ -255,9 +271,11 @@ fn process_notes_half(
         }
         match note_type {
             NoteType::Tap | NoteType::Drag | NoteType::Flick => {
-                process_normal_note(reverse, line_state, note_state, out);
+                process_normal_note(reverse, line_state, note_state, world_rect, out);
             }
-            NoteType::Hold => process_hold_note(reverse, line_state, note_state, offset, out_hold),
+            NoteType::Hold => process_hold_note(
+                reverse, line_state, note_state, offset, world_rect, out_hold,
+            ),
         }
     }
 }
@@ -266,6 +284,7 @@ fn process_normal_note(
     reverse: bool,
     line_state: &LineState,
     note_state: &NoteState,
+    world_rect: &Rect,
     out: &mut Vec<RendNote>,
 ) {
     let LineState {
@@ -294,12 +313,12 @@ fn process_normal_note(
         return;
     }
     let Point { x: raw_x, y: raw_y } =
-        math::get_pos_out_of_line(*x, *y, *rotate, position_x * math::UNIT_WIDTH);
+        math::get_pos_out_of_line(*x, *y, *rotate, position_x * world_rect.get_unit_width());
     let Point { x, y } = math::get_pos_out_of_line(
         raw_x,
         raw_y,
         *rotate + if reverse { 90.0 } else { -90.0 },
-        delta_y * math::UNIT_HEIGHT * speed,
+        delta_y * world_rect.get_unit_height() * speed,
     );
     if !check_in_bound(x, y) {
         return;
@@ -321,6 +340,7 @@ fn process_hold_note(
     line_state: &LineState,
     note_state: &NoteState,
     offset: &DrawImageOffset,
+    world_rect: &Rect,
     out_hold: &mut Vec<RendNote>,
 ) {
     let LineState {
@@ -359,13 +379,13 @@ fn process_hold_note(
     let Point {
         x: temp_x,
         y: temp_y,
-    } = math::get_pos_out_of_line(*x, *y, *rotate, position_x * math::UNIT_WIDTH);
+    } = math::get_pos_out_of_line(*x, *y, *rotate, position_x * world_rect.get_unit_width());
     let Point { x: hx, y: hy } = math::get_pos_out_of_line(
         temp_x,
         temp_y,
         math::fix_degree(rotate + if reverse { 90.0 } else { -90.0 }),
         head_position.mul_add(
-            math::UNIT_HEIGHT,
+            world_rect.get_unit_height(),
             -(if *highlight {
                 offset.hold_head_highlight_height / 2.0
             } else {
@@ -377,7 +397,7 @@ fn process_hold_note(
         temp_x,
         temp_y,
         math::fix_degree(rotate + if reverse { 90.0 } else { -90.0 }),
-        body_position * math::UNIT_HEIGHT
+        body_position * world_rect.get_unit_height()
             + if body_position <= 0.0 {
                 body_height / 2.0
             } else {
@@ -387,11 +407,11 @@ fn process_hold_note(
     let hold_rect = math::Rect {
         cx: bx,
         cy: by,
-        width: math::WORLD_WIDTH / 4.0,
-        height: body_height * math::UNIT_HEIGHT,
+        width: world_rect.width / 4.0,
+        height: body_height * world_rect.get_unit_height(),
         rotate: rotate.to_radians(),
     };
-    if !math::check_rectangles_overlap(&math::WORLD_RECT, &hold_rect) {
+    if !math::check_rectangles_overlap(world_rect, &hold_rect) {
         return;
     }
     let Point { x: ex, y: ey } = math::get_pos_out_of_line(
@@ -399,7 +419,7 @@ fn process_hold_note(
         temp_y,
         math::fix_degree(rotate + if reverse { 90.0 } else { -90.0 }),
         (body_position + body_height / 2.0).mul_add(
-            math::UNIT_HEIGHT,
+            world_rect.get_unit_height(),
             if *highlight {
                 offset.hold_end_highlight_height / 2.0
             } else {
@@ -422,7 +442,7 @@ fn process_hold_note(
         x: bx as f32,
         y: by as f32,
         rotate: math::fix_degree(*rotate + if reverse { 180.0 } else { 0.0 }) as f32,
-        height: (body_height * math::UNIT_HEIGHT) as f32,
+        height: (body_height * world_rect.get_unit_height()) as f32,
         high_light: should_high_light,
     });
     if *time > *tick_time as i32 {
