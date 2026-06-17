@@ -24,11 +24,11 @@ fn get_line_y(tick_time: f64, line: &LineData) -> f64 {
         if event.start_time < tick_time && tick_time < event.end_time {
             let duration = event.end_time - event.start_time;
             let percent = (tick_time - event.start_time) / duration;
-            t += duration * percent * event.value;
+            t = (duration * percent).mul_add(event.value, t);
             break;
         }
         if event.end_time < tick_time {
-            t += (event.end_time - event.start_time) * event.value;
+            t = (event.end_time - event.start_time).mul_add(event.value, t);
         }
     }
     t * seconds_per_tick

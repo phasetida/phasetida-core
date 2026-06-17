@@ -33,8 +33,8 @@ pub fn init_line_states(chart_raw: chart::ChartRaw) -> Metadata {
         .judge_line_list
         .into_iter()
         .map(|mut line| {
-            line.notes_above.sort_by(|a, b| (a.time).cmp(&b.time));
-            line.notes_below.sort_by(|a, b| (a.time).cmp(&b.time));
+            line.notes_above.sort_by_key(|a| a.time);
+            line.notes_below.sort_by_key(|a| a.time);
             line
         })
         .collect::<Vec<_>>();

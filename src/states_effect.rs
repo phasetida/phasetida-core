@@ -83,7 +83,7 @@ pub fn tick_effect(delta_time_in_second: f64) {
     HIT_EFFECT_POOL.with_borrow_mut(|pool| {
         for it in pool.iter_mut() {
             if it.enable {
-                it.progress += delta_time_in_second.max(0.0) * RATE;
+                it.progress = delta_time_in_second.max(0.0).mul_add(RATE, it.progress);
                 if it.progress >= 1.0 {
                     it.enable = false;
                 }
@@ -93,14 +93,14 @@ pub fn tick_effect(delta_time_in_second: f64) {
     SPLASH_EFFECT_POOL.with_borrow_mut(|pool| {
         for it in pool.iter_mut() {
             if it.enable {
-                it.progress += delta_time_in_second.max(0.0) * RATE;
+                it.progress = delta_time_in_second.max(0.0).mul_add(RATE, it.progress);
                 if it.progress >= 1.0 {
                     it.enable = false;
                     continue;
                 }
                 it.speed -= (it.speed * 7.0 * delta_time_in_second.max(0.0)).max(0.0);
-                it.x += it.speed * it.x_vec * delta_time_in_second.max(0.0);
-                it.y += it.speed * it.y_vec * delta_time_in_second.max(0.0);
+                it.x = (it.speed * it.x_vec).mul_add(delta_time_in_second.max(0.0), it.x);
+                it.y = (it.speed * it.y_vec).mul_add(delta_time_in_second.max(0.0), it.y);
             }
         }
     });
