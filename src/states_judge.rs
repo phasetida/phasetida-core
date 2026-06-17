@@ -8,7 +8,7 @@ use crate::{
     states_statistics::NoteIndex,
 };
 
-pub(crate) fn tick_lines_judge(delta_time_in_second: f64, auto: bool) -> bool {
+pub fn tick_lines_judge(delta_time_in_second: f64, auto: bool) -> bool {
     states_effect::clear_sound_effect();
     TOUCH_STATES.with_borrow_mut(|touches| {
         LINE_STATES.with_borrow_mut(|lines| {
@@ -273,7 +273,7 @@ fn tick_hold_note_auto(
     delta_time_in_second: f64,
     current_tick: f64,
     note: &mut NoteState,
-    touches: &mut [TouchInfo],
+    touches: &[TouchInfo],
     line_x: f64,
     line_y: f64,
     line_rotate: f64,
@@ -306,7 +306,7 @@ fn tick_hold_note_common(
     delta_time_in_second: f64,
     current_tick: f64,
     note: &mut NoteState,
-    touches: &mut [TouchInfo],
+    touches: &[TouchInfo],
     line_x: f64,
     line_y: f64,
     line_rotate: f64,

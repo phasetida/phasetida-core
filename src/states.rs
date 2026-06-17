@@ -60,7 +60,7 @@ pub struct Metadata {
 
 impl Default for LineState {
     fn default() -> Self {
-        LineState {
+        Self {
             enable: false,
             x: 0.0,
             y: 0.0,
@@ -86,7 +86,7 @@ impl Default for LineState {
 
 impl Default for NoteState {
     fn default() -> Self {
-        NoteState {
+        Self {
             highlight: false,
             score: NoteScore::None,
             hold_cool_down: 0.0,

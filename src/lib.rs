@@ -10,6 +10,7 @@
 //!
 
 #![deny(clippy::pedantic)]
+#![deny(clippy::nursery)]
 #![deny(missing_docs)]
 #![allow(clippy::cast_possible_truncation)]
 

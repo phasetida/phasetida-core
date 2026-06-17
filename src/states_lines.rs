@@ -5,7 +5,7 @@ use crate::{
     states::LineState,
 };
 
-pub(crate) fn tick_lines(time_in_second: f64) {
+pub fn tick_lines(time_in_second: f64) {
     LINE_STATES.with_borrow_mut(|x| {
         for state in x.iter_mut() {
             tick_line_state(time_in_second, state);
@@ -50,7 +50,7 @@ fn tick_line_state(time_in_second: f64, state: &mut LineState) {
         &state.alpha_events,
         state.event_alpha_index_cache,
     );
-    state.alpha = alpha_start + (alpha_end - alpha_start) * alpha_percent;
+    state.alpha = (alpha_end - alpha_start).mul_add(alpha_percent, alpha_start);
     state.event_alpha_index_cache = alpha_new_index;
     let ((rotate_start, rotate_end), rotate_percent, rotate_new_index) =
         get_current_value_for_event(
@@ -59,13 +59,13 @@ fn tick_line_state(time_in_second: f64, state: &mut LineState) {
             state.event_rotate_index_cache,
         );
     state.rotate =
-        math::fix_degree(360.0 - (rotate_start + (rotate_end - rotate_start) * rotate_percent));
+        math::fix_degree(360.0 - (rotate_end - rotate_start).mul_add(rotate_percent, rotate_start));
     state.event_rotate_index_cache = rotate_new_index;
     let (((line_x_start, line_x_end), (line_y_start, line_y_end)), line_percent, line_new_index) =
         get_current_value_for_event(tick_time, &state.move_events, state.event_move_index_cache);
-    state.x = math::WORLD_WIDTH * (line_x_start + (line_x_end - line_x_start) * line_percent);
-    state.y =
-        math::WORLD_HEIGHT * (1.0 - (line_y_start + (line_y_end - line_y_start) * line_percent));
+    state.x = math::WORLD_WIDTH * (line_x_end - line_x_start).mul_add(line_percent, line_x_start);
+    state.y = math::WORLD_HEIGHT
+        * (1.0 - (line_y_end - line_y_start).mul_add(line_percent, line_y_start));
     state.event_move_index_cache = line_new_index;
     state.line_y = get_line_y(tick_time, state);
     state.tick_time = tick_time;
@@ -120,11 +120,9 @@ where
             if i <= 0 {
                 return None;
             }
-            return if let Some(x) = events.last() {
-                Some((x, i64::from(events.len() as u32) - 1, 1.0))
-            } else {
-                None
-            };
+            return events
+                .last()
+                .map(|x| (x, i64::from(events.len() as u32) - 1, 1.0));
         }
     }
 }

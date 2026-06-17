@@ -29,7 +29,7 @@ pub trait BufferWithCursor {
 
 impl Default for DrawImageOffset {
     fn default() -> Self {
-        DrawImageOffset {
+        Self {
             hold_head_height: 0.0,
             hold_head_highlight_height: 0.0,
             hold_end_height: 0.0,
@@ -348,7 +348,7 @@ fn process_hold_note(
     let should_high_light = i8::from(*highlight);
     let seconds_per_tick = 60.0 / bpm / 32.0;
     let head_position = floor_position - line_y;
-    let body_height = hold_time * speed * seconds_per_tick - 0.0f64.max(-head_position);
+    let body_height = (hold_time * speed).mul_add(seconds_per_tick, -0.0f64.max(-head_position));
     let body_position = floor_position + body_height / 2.0 - line_y + 0.0f64.max(-head_position);
     if *time + *hold_time as i32 <= *tick_time as i32 {
         return;
@@ -364,12 +364,14 @@ fn process_hold_note(
         temp_x,
         temp_y,
         math::fix_degree(rotate + if reverse { 90.0 } else { -90.0 }),
-        head_position * math::UNIT_HEIGHT
-            - (if *highlight {
+        head_position.mul_add(
+            math::UNIT_HEIGHT,
+            -(if *highlight {
                 offset.hold_head_highlight_height / 2.0
             } else {
                 offset.hold_head_height / 2.0
             }),
+        ),
     );
     let Point { x: bx, y: by } = math::get_pos_out_of_line(
         temp_x,
@@ -396,12 +398,14 @@ fn process_hold_note(
         temp_x,
         temp_y,
         math::fix_degree(rotate + if reverse { 90.0 } else { -90.0 }),
-        (body_position + body_height / 2.0) * math::UNIT_HEIGHT
-            + (if *highlight {
+        (body_position + body_height / 2.0).mul_add(
+            math::UNIT_HEIGHT,
+            if *highlight {
                 offset.hold_end_highlight_height / 2.0
             } else {
                 offset.hold_end_height / 2.0
-            }),
+            },
+        ),
     );
     out_hold.push(RendNote {
         rend_type: 2,

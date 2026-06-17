@@ -19,7 +19,7 @@ pub struct ChartStatistics {
 
 impl Default for ChartStatistics {
     fn default() -> Self {
-        ChartStatistics {
+        Self {
             combo: 0,
             max_combo: 0,
             score: 0.0,
@@ -94,7 +94,7 @@ fn internal_init_flatten_line_state(line_states: &[LineState], flatten_index: &m
     *flatten_index = o;
 }
 
-pub(crate) fn refresh_chart_statistics() {
+pub fn refresh_chart_statistics() {
     LINE_STATES.with_borrow(|line_states| {
         FLATTEN_NOTE_INDEX.with_borrow(|flatten_index| {
             CHART_STATISTICS.with_borrow_mut(|chart_statistics| {
@@ -129,22 +129,19 @@ fn internal_refresh_chart_statistics(
     }
     let max_combo = combos.iter().max().copied().unwrap_or(0u32);
     let current_combo = combos.last().copied().unwrap_or(0u32);
-    let judge_results =
-        flatten_index
-            .iter()
-            .fold((0, 0), |score, it| match it.find_note(line_states) {
-                None => score,
-                Some(state) => match state.score {
-                    states::NoteScore::Perfect => (score.0 + 1, score.1),
-                    states::NoteScore::Good => (score.0, score.1 + 1),
-                    _ => score,
-                },
-            });
+    let judge_results = flatten_index.iter().fold((0, 0), |score, it| {
+        it.find_note(line_states)
+            .map_or(score, |state| match state.score {
+                states::NoteScore::Perfect => (score.0 + 1, score.1),
+                states::NoteScore::Good => (score.0, score.1 + 1),
+                _ => score,
+            })
+    });
     let total_notes = flatten_index.len();
     let accurate = (f64::from(judge_results.0) + f64::from(judge_results.1) * 0.65)
         / f64::from(total_notes as u32);
-    let score =
-        (f64::from(max_combo) / f64::from(total_notes as u32) * 100_000.0) + (accurate * 900_000.0);
+    let score = (f64::from(max_combo) / f64::from(total_notes as u32))
+        .mul_add(100_000.0, accurate * 900_000.0);
     *chart_statistics = ChartStatistics {
         combo: current_combo,
         max_combo,
