@@ -309,7 +309,7 @@ fn process_normal_note(
     } = note_state;
     let should_high_light = i8::from(*highlight);
     let delta_y = floor_position - line_y;
-    if *time <= line_state.tick_time as i32 || *line_y > *floor_position + 0.001 {
+    if *time <= line_state.tick_time as i32 || *line_y > *floor_position + 0.01 {
         return;
     }
     let Point { x: raw_x, y: raw_y } =
