@@ -3,11 +3,12 @@ use std::{collections::HashSet, default::Default};
 use crate::{
     CHART_STATISTICS, FLATTEN_NOTE_INDEX, HIT_EFFECT_POOL, LINE_STATES, SOUND_POOL,
     SPLASH_EFFECT_POOL, TOUCH_STATES, WORLD_RECT,
-    chart::{self, ChartRaw, JudgeLine, WithTimeRange},
+    chart::{self, ChartRaw, Event1, JudgeLine, WithTimeRange},
     input::TouchInfo,
     math::Rect,
     states::{LineData, LineState, Metadata, NoteState, get_seconds_per_tick},
     states_effect::{HitEffect, SoundEffect, SplashEffect},
+    states_lines::get_line_y_direct,
     states_statistics::{self, ChartStatistics},
 };
 
@@ -92,6 +93,24 @@ pub fn init_line_states(chart_raw: chart::ChartRaw) -> Metadata {
     });
     states_statistics::init_flatten_line_state();
     metadata
+}
+
+/// Ignore present value, then re calculate [`floor_position`]
+pub fn recalculate_floor_position() {
+    fn process_half(states: &mut [NoteState], bpm: f64, speed_event: &[Event1]) {
+        for note_state in states {
+            let note = &mut note_state.note;
+            let line_y = get_line_y_direct(note.time.into(), bpm, speed_event);
+            note.floor_position = line_y;
+        }
+    }
+    LINE_STATES.with_borrow_mut(|state| {
+        for line in state {
+            let bpm = line.bpm;
+            process_half(&mut line.notes_below_state, bpm, &line.speed_events);
+            process_half(&mut line.notes_above_state, bpm, &line.speed_events);
+        }
+    });
 }
 
 /// Initialize world rect from width and height

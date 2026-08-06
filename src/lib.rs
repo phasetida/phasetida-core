@@ -53,6 +53,7 @@ pub use states_initializing::clear_states;
 pub use states_initializing::init_line_states;
 pub use states_initializing::init_line_states_from_json;
 pub use states_initializing::init_world_rect;
+pub use states_initializing::recalculate_floor_position;
 
 pub use states_input::clear_touch;
 pub use states_input::set_touch_down;

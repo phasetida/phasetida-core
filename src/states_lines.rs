@@ -1,6 +1,6 @@
 use crate::{
     LINE_STATES,
-    chart::{self, TimeState, WithTimeRange, WithValue},
+    chart::{self, Event1, TimeState, WithTimeRange, WithValue},
     math::{self, Rect},
     states::LineData,
 };
@@ -14,21 +14,24 @@ pub fn tick_lines(time_in_second: f64, world_rect: &Rect) {
 }
 
 fn get_line_y(tick_time: f64, line: &LineData) -> f64 {
+    get_line_y_direct(tick_time, line.bpm, &line.speed_events)
+}
+
+pub fn get_line_y_direct(tick_time: f64, bpm: f64, speed_events: &[Event1]) -> f64 {
     let mut t = 0.0;
-    let seconds_per_tick = 60.0 / line.bpm / 32.0;
-    let speed_events = &line.speed_events;
+    let seconds_per_tick = 60.0 / bpm / 32.0;
     for event in speed_events {
-        if event.end_time > tick_time && event.start_time > tick_time {
-            break;
-        }
-        if event.start_time < tick_time && tick_time < event.end_time {
+        if event.start_time <= tick_time && tick_time <= event.end_time {
             let duration = event.end_time - event.start_time;
             let percent = (tick_time - event.start_time) / duration;
             t = (duration * percent).mul_add(event.value, t);
             break;
         }
-        if event.end_time < tick_time {
+        if event.end_time <= tick_time {
             t = (event.end_time - event.start_time).mul_add(event.value, t);
+        }
+        if event.end_time > tick_time && event.start_time > tick_time {
+            break;
         }
     }
     t * seconds_per_tick
