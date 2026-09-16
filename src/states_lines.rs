@@ -100,6 +100,9 @@ where
     let mut i = cache_index.clamp(0, i64::from(events.len() as u32));
     let mut last_result: TimeState = TimeState::During(0.0);
     loop {
+        if i < 0 {
+            return None;
+        }
         let op = events.get(i.max(0).unsigned_abs() as usize);
         if let Some(event) = op {
             let result = event.check_time(tick_time);
@@ -120,9 +123,6 @@ where
             }
             last_result = result;
         } else {
-            if i <= 0 {
-                return None;
-            }
             return events
                 .last()
                 .map(|x| (x, i64::from(events.len() as u32) - 1, 1.0));
