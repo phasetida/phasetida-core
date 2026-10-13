@@ -6,10 +6,13 @@ use crate::{
     chart::{self, ChartRaw, Event1, JudgeLine, WithTimeRange},
     input::TouchInfo,
     math::Rect,
-    states::{LineData, LineState, Metadata, NoteState, get_seconds_per_tick},
-    states_effect::{HitEffect, SoundEffect, SplashEffect},
-    states_lines::get_line_y_direct,
-    states_statistics::{self, ChartStatistics},
+    states::{
+        self, LineData, LineState, Metadata, NoteState,
+        effect::{HitEffect, SoundEffect, SplashEffect},
+        get_seconds_per_tick,
+        lines::get_line_y_direct,
+        statistics::ChartStatistics,
+    },
 };
 
 /// Initialize state of lines from raw json.
@@ -91,7 +94,7 @@ pub fn init_line_states(chart_raw: chart::ChartRaw) -> Metadata {
             format_version,
         }
     });
-    states_statistics::init_flatten_line_state();
+    states::statistics::init_flatten_line_state();
     metadata
 }
 

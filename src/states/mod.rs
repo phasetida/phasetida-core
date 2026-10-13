@@ -1,3 +1,10 @@
+pub mod effect;
+pub mod initializing;
+pub mod input;
+pub mod judge;
+pub mod lines;
+pub mod statistics;
+
 use std::ops::{Deref, DerefMut};
 
 use serde::Serialize;
@@ -5,7 +12,6 @@ use serde::Serialize;
 use crate::{
     LINE_STATES, WORLD_RECT,
     chart::{self},
-    states_effect, states_judge, states_lines, states_statistics,
 };
 
 #[derive(Default)]
@@ -149,16 +155,16 @@ pub fn reset_note_state(before_time_in_second: f64) {
             process_notes(&mut line.notes_below_state);
         }
     });
-    states_statistics::refresh_chart_statistics();
+    statistics::refresh_chart_statistics();
 }
 
 /// Ticking all states, including lines, judges and chart statistics
 pub fn tick_all(time_in_second: f64, delta_time_in_second: f64, auto: bool) {
     WORLD_RECT.with_borrow(|world_rect| {
-        states_lines::tick_lines(time_in_second, world_rect);
-        states_effect::tick_effect(delta_time_in_second);
-        if states_judge::tick_lines_judge(delta_time_in_second, auto, world_rect) {
-            states_statistics::refresh_chart_statistics();
+        lines::tick_lines(time_in_second, world_rect);
+        effect::tick_effect(delta_time_in_second);
+        if judge::tick_lines_judge(delta_time_in_second, auto, world_rect) {
+            statistics::refresh_chart_statistics();
         }
     });
 }

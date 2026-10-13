@@ -3,13 +3,11 @@ use crate::{
     chart::{Note, NoteType},
     input::TouchInfo,
     math::{self, Point, Rect},
-    states::{LineData, LineState, NoteScore, NoteState},
-    states_effect,
-    states_statistics::NoteIndex,
+    states::{self, LineData, LineState, NoteScore, NoteState, statistics::NoteIndex},
 };
 
 pub fn tick_lines_judge(delta_time_in_second: f64, auto: bool, world_rect: &Rect) -> bool {
-    states_effect::clear_sound_effect();
+    states::effect::clear_sound_effect();
     TOUCH_STATES.with_borrow_mut(|touches| {
         LINE_STATES.with_borrow_mut(|lines| {
             FLATTEN_NOTE_INDEX.with_borrow(|flatten_note_index| {
@@ -164,8 +162,8 @@ fn check_judge_result(current_tick: f64, note: &NoteState, bpm: f64) -> (f64, No
 
 fn create_splash(seed: f64, x: f64, y: f64, note_score: NoteScore) {
     match note_score {
-        NoteScore::Perfect => states_effect::new_click_effect(seed, x, y, 0),
-        NoteScore::Good => states_effect::new_click_effect(seed, x, y, 1),
+        NoteScore::Perfect => states::effect::new_click_effect(seed, x, y, 0),
+        NoteScore::Good => states::effect::new_click_effect(seed, x, y, 1),
         _ => {}
     }
 }
@@ -199,7 +197,7 @@ fn tick_normal_note_auto(
         );
         note.score = NoteScore::Perfect;
         create_splash(current_tick, root_x, root_y, NoteScore::Perfect);
-        states_effect::new_sound_effect(note.note.r#type);
+        states::effect::new_sound_effect(note.note.r#type);
         return true;
     }
     false
@@ -239,7 +237,7 @@ fn tick_flick_note(
             );
             note.score = NoteScore::Perfect;
             create_splash(current_tick, root_x, root_y, NoteScore::Perfect);
-            states_effect::new_sound_effect(NoteType::Flick);
+            states::effect::new_sound_effect(NoteType::Flick);
             return true;
         }
         return false;
@@ -278,7 +276,7 @@ fn tick_hold_note_auto(
     let (judge_delta, _) = check_judge_result(current_tick, note, bpm);
     if judge_delta >= 0.0 && note.extra_score != NoteScore::Perfect {
         note.extra_score = NoteScore::Perfect;
-        states_effect::new_sound_effect(NoteType::Hold);
+        states::effect::new_sound_effect(NoteType::Hold);
     }
     tick_hold_note_common(
         delta_time_in_second,
@@ -398,7 +396,7 @@ fn tick_hold_note(
             }
             touch.touch_valid = false;
             note.extra_score = judge_result;
-            states_effect::new_sound_effect(NoteType::Hold);
+            states::effect::new_sound_effect(NoteType::Hold);
             return false;
         }
     }
@@ -438,7 +436,7 @@ fn tick_drag_note(
                 note.note.position_x * world_rect.get_unit_width(),
             );
             note.score = NoteScore::Perfect;
-            states_effect::new_sound_effect(NoteType::Drag);
+            states::effect::new_sound_effect(NoteType::Drag);
             create_splash(current_tick, root_x, root_y, NoteScore::Perfect);
             return true;
         }
@@ -491,7 +489,7 @@ fn tick_tap_note(
         if is_in_judge_range && touch.touch_valid {
             touch.touch_valid = false;
             note.score = judge_result;
-            states_effect::new_sound_effect(NoteType::Tap);
+            states::effect::new_sound_effect(NoteType::Tap);
             create_splash(current_tick, root_x, root_y, judge_result);
             return true;
         }

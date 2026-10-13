@@ -3,8 +3,8 @@ use crate::math::{self, Point, Rect};
 use crate::renders::{
     self, Dense, RendClickEffect, RendNote, RendPoint, RendSound, RendSplashEffect, RendStatistics,
 };
+use crate::states::effect::{HitEffect, SoundEffect, SplashEffect};
 use crate::states::{LineData, LineState, NoteScore, NoteState};
-use crate::states_effect::{HitEffect, SoundEffect, SplashEffect};
 use crate::{
     CHART_STATISTICS, DRAW_IMAGE_OFFSET, HIT_EFFECT_POOL, LINE_STATES, SOUND_POOL,
     SPLASH_EFFECT_POOL, TOUCH_STATES, WORLD_RECT,
