@@ -1,13 +1,17 @@
+use geo::{BooleanOps, Centroid, Polygon, unary_union};
+
 use crate::chart::{Note, NoteType};
 use crate::math::{self, Point, Rect};
 use crate::renders::{
-    self, Dense, RendClickEffect, RendNote, RendPoint, RendSound, RendSplashEffect, RendStatistics,
+    self, Dense, RendBlockAreaDebugPos, RendBlockAreaPolygon, RendClickEffect, RendNote, RendPoint,
+    RendSound, RendSplashEffect, RendStatistics,
 };
+use crate::states::block_area::{BlockAreaData, BlockAreaTimeState};
 use crate::states::effect::{HitEffect, SoundEffect, SplashEffect};
 use crate::states::{LineData, LineState, NoteScore, NoteState};
 use crate::{
-    CHART_STATISTICS, DRAW_IMAGE_OFFSET, HIT_EFFECT_POOL, LINE_STATES, SOUND_POOL,
-    SPLASH_EFFECT_POOL, TOUCH_STATES, WORLD_RECT,
+    BLOCK_AREA_STATES, CHART_STATISTICS, DRAW_IMAGE_OFFSET, HIT_EFFECT_POOL, LINE_STATES,
+    SOUND_POOL, SPLASH_EFFECT_POOL, TOUCH_STATES, WORLD_RECT,
 };
 
 #[allow(clippy::struct_field_names)]
@@ -25,6 +29,9 @@ pub struct DrawImageOffset {
 pub trait BufferWithCursor {
     /// Called when `slice` is written to the buffer.
     fn write(&mut self, slice: &[u8]);
+
+    /// Returns current cursor
+    fn cursor(&self) -> usize;
 }
 
 impl Default for DrawImageOffset {
@@ -102,6 +109,15 @@ pub fn process_state_to_drawable(wrapped_buffer: &mut impl BufferWithCursor) {
                     }
                     .to_bytes(),
                 );
+            }
+        });
+        BLOCK_AREA_STATES.with_borrow(|data| {
+            for time_state in [
+                BlockAreaTimeState::Disabled,
+                BlockAreaTimeState::Ready,
+                BlockAreaTimeState::Active,
+            ] {
+                write_block_area(wrapped_buffer, data.as_ref(), time_state, world_rect);
             }
         });
         wrapped_buffer.write(&[0]);
@@ -457,3 +473,145 @@ fn process_hold_note(
         });
     }
 }
+
+fn write_block_area(
+    wrapped_buffer: &mut impl BufferWithCursor,
+    states: &[BlockAreaData],
+    time_state: BlockAreaTimeState,
+    world_rect: &Rect,
+) {
+    // 哦先生，这可要算不少时间
+    if time_state == BlockAreaTimeState::Ready {
+        for it in states
+            .iter()
+            .filter(|it| it.state.enable && it.state.time_state == time_state)
+        {
+            write_block_area_polygon(
+                wrapped_buffer,
+                &it.state.polygon,
+                it.state.ready_progress as f32,
+                time_state,
+                world_rect,
+            );
+        }
+    } else {
+        let ready_progress = states
+            .iter()
+            .find(|it| it.state.enable && !it.is_subtract && it.state.time_state == time_state)
+            .map_or(0.0, |it| it.state.ready_progress) as f32;
+        let multi_polygon = unary_union(
+            states
+                .iter()
+                .filter(|it| {
+                    it.state.enable && !it.is_subtract && it.state.time_state == time_state
+                })
+                .map(|it| &it.state.polygon),
+        )
+        .xor(&unary_union(
+            states
+                .iter()
+                .filter(|it| it.state.enable && it.is_subtract && it.state.time_state == time_state)
+                .map(|it| &it.state.polygon),
+        ));
+        for polygon in multi_polygon {
+            write_block_area_polygon(
+                wrapped_buffer,
+                &polygon,
+                ready_progress,
+                time_state,
+                world_rect,
+            );
+        }
+    }
+    for (i, it) in states
+        .iter()
+        .enumerate()
+        .filter(|(_, it)| it.state.enable && it.state.time_state == time_state)
+    {
+        let centroid = it.state.polygon.centroid().expect("should exist");
+        wrapped_buffer.write(
+            RendBlockAreaDebugPos {
+                rend_type: 9,
+                index: i as u32,
+                x: centroid.x() as f32,
+                y: (world_rect.height - centroid.y()) as f32,
+            }
+            .to_bytes(),
+        );
+    }
+}
+
+fn write_block_area_polygon(
+    wrapped_buffer: &mut impl BufferWithCursor,
+    polygon: &Polygon,
+    ready_progress: f32,
+    time_state: BlockAreaTimeState,
+    world_rect: &Rect,
+) {
+    let outer = polygon
+        .exterior()
+        .coords()
+        .map(|it| vec![it.x, it.y])
+        .collect::<Vec<_>>();
+    let inner = polygon
+        .interiors()
+        .iter()
+        .map(|it| it.coords().map(|it| vec![it.x, it.y]).collect::<Vec<_>>());
+    let combined = std::iter::once(outer).chain(inner).collect::<Vec<_>>();
+    let (vertices, holes, dimensions) = earcutr::flatten(&combined);
+    let vertex_indices = match earcutr::earcut::<f64>(&vertices, &holes, dimensions) {
+        Ok(x) => x,
+        Err(e) => {
+            println!("{e:?}");
+            return;
+        }
+    };
+    let (mut opt_vertices, opt_vertex_indices) = (vertices, vertex_indices);
+    for y in opt_vertices.iter_mut().skip(1).step_by(2) {
+        *y = world_rect.height - *y;
+    }
+    wrapped_buffer.write(
+        RendBlockAreaPolygon {
+            rend_type: 8,
+            vertex_element_count: opt_vertices.len() as u32,
+            vertex_index_count: opt_vertex_indices.len() as u32,
+            ready_progress,
+            time_state: time_state as i8,
+        }
+        .to_bytes(),
+    );
+    let cursor_offset = (4 - wrapped_buffer.cursor() % 4) % 4;
+    wrapped_buffer.write(&std::iter::repeat_n(0, cursor_offset).collect::<Vec<_>>());
+    wrapped_buffer.write(
+        &opt_vertices
+            .into_iter()
+            .map(|it| it as f32)
+            .flat_map(f32::to_le_bytes)
+            .collect::<Vec<_>>(),
+    );
+    wrapped_buffer.write(
+        &opt_vertex_indices
+            .into_iter()
+            .map(|it| it as u16)
+            .flat_map(u16::to_le_bytes)
+            .collect::<Vec<_>>(),
+    );
+}
+
+// fn optimize_vertices(vertices: Vec<f64>, indices: &[usize]) -> (Vec<f64>, Vec<u32>) {
+//     #[repr(C)]
+//     struct Vertex {
+//         x: f64,
+//         y: f64,
+//     }
+//     let vertices = vertices
+//         .windows(2)
+//         .step_by(2)
+//         .map(|it| Vertex { x: it[0], y: it[1] })
+//         .collect::<Vec<_>>();
+//     let indices = indices.iter().map(|it| *it as u32).collect::<Vec<_>>();
+//     let (vertex_count, remap) = meshopt::generate_vertex_remap(vertices, Some(&indices));
+//     let new_vertices = remap_vertex_buffer(vertices, vertex_count, &remap);
+//     let new_indices = remap_index_buffer(Some(&indices), vertex_count, &remap);
+//     (new_vertices, new_indices)
+// }

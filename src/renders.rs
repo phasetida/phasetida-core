@@ -61,6 +61,26 @@ pub struct RendSound {
     pub flick_sound: i8,
 }
 
+#[repr(C, packed)]
+pub struct RendBlockAreaPolygon {
+    pub rend_type: i8,
+    pub time_state: i8,
+    pub vertex_element_count: u32,
+    pub vertex_index_count: u32,
+    pub ready_progress: f32,
+    // [Fill to align 4 byte]
+    // [Vertexes as f32]
+    // [Vertex index as u16]
+}
+
+#[repr(C, packed)]
+pub struct RendBlockAreaDebugPos {
+    pub rend_type: i8,
+    pub index: u32,
+    pub x: f32,
+    pub y: f32,
+}
+
 pub trait Dense {
     fn to_bytes(&self) -> &[u8]
     where
@@ -82,3 +102,5 @@ impl Dense for RendPoint {}
 impl Dense for RendStatistics {}
 impl Dense for RendSplashEffect {}
 impl Dense for RendSound {}
+impl Dense for RendBlockAreaPolygon {}
+impl Dense for RendBlockAreaDebugPos {}

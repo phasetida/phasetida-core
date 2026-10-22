@@ -1,8 +1,8 @@
 use std::{collections::HashSet, default::Default};
 
 use crate::{
-    CHART_STATISTICS, FLATTEN_NOTE_INDEX, HIT_EFFECT_POOL, LINE_STATES, SOUND_POOL,
-    SPLASH_EFFECT_POOL, TOUCH_STATES, WORLD_RECT,
+    BLOCK_AREA_STATES, CHART_STATISTICS, FLATTEN_NOTE_INDEX, HIT_EFFECT_POOL, LINE_STATES,
+    SOUND_POOL, SPLASH_EFFECT_POOL, TOUCH_STATES, WORLD_RECT,
     chart::{self, ChartRaw, Event1, JudgeLine, WithTimeRange},
     input::TouchInfo,
     math::Rect,
@@ -10,42 +10,52 @@ use crate::{
         self, LineData, LineState, Metadata, NoteState,
         effect::{HitEffect, SoundEffect, SplashEffect},
         get_seconds_per_tick,
+        initializing::block_area::init_block_area,
         lines::get_line_y_direct,
         statistics::ChartStatistics,
     },
 };
 
-/// Initialize state of lines from raw json.
+/// Parse a chart from raw json.
 ///
 /// # Errors
 ///
 /// This function will return an error if the deserialization failed.
-pub fn init_line_states_from_json(json: &str) -> Result<Metadata, serde_json::Error> {
+pub fn parse_chart_json(json: &str) -> Result<chart::Chart, serde_json::Error> {
     let chart_raw = serde_json::from_str::<ChartRaw>(json)?;
-    Ok(init_line_states(chart_raw))
+    Ok(chart_raw.convert_to_v3())
+}
+
+/// Initialize state of lines from chart.
+///
+/// # Errors
+///
+/// This function will return an error if the deserialization failed.
+pub fn init_states(chart: &mut chart::Chart) -> Result<Metadata, serde_json::Error> {
+    let world_rect = WORLD_RECT.with_borrow(|it| *it);
+    let block_areas = chart
+        .block_area_list
+        .as_ref()
+        .map_or_default(std::vec::Vec::len) as u32;
+    init_block_area(chart, &world_rect);
+    Ok(Metadata {
+        format_version: chart.format_version,
+        block_areas,
+        ..init_line_states(chart)
+    })
 }
 
 /// Initialize state of lines from standard V3 chart
 #[must_use]
-pub fn init_line_states(chart_raw: chart::ChartRaw) -> Metadata {
-    let format_version = match chart_raw {
-        ChartRaw::V1(_) => 1,
-        ChartRaw::V3(_) => 3,
-    };
-    let mut chart = chart_raw.convert_to_v3();
-    chart.judge_line_list = chart
-        .judge_line_list
-        .into_iter()
-        .map(|mut line| {
-            line.notes_above.sort_by_key(|a| a.time);
-            line.notes_below.sort_by_key(|a| a.time);
-            line
-        })
-        .collect::<Vec<_>>();
+pub fn init_line_states(chart: &mut chart::Chart) -> Metadata {
+    for line in &mut chart.judge_line_list {
+        line.notes_above.sort_by_key(|a| a.time);
+        line.notes_below.sort_by_key(|a| a.time);
+    }
     let metadata = LINE_STATES.with_borrow_mut(|states| {
-        *states = std::array::from_fn(|_| LineData::default());
+        states.clear();
         let available_len = chart.judge_line_list.len();
-        for (i, it) in chart.judge_line_list.into_iter().enumerate() {
+        for it in &chart.judge_line_list {
             let JudgeLine {
                 bpm,
                 notes_above,
@@ -55,16 +65,16 @@ pub fn init_line_states(chart_raw: chart::ChartRaw) -> Metadata {
                 rotate_events,
                 alpha_events,
             } = it;
-            states[i] = LineData {
+            states.push(LineData {
                 line_state: LineState {
                     enable: true,
-                    bpm,
+                    bpm: *bpm,
                     ..Default::default()
                 },
-                move_events,
-                alpha_events,
-                speed_events,
-                rotate_events,
+                move_events: move_events.clone(),
+                alpha_events: alpha_events.clone(),
+                speed_events: speed_events.clone(),
+                rotate_events: rotate_events.clone(),
                 notes_above_state: notes_above
                     .clone()
                     .into_iter()
@@ -81,7 +91,7 @@ pub fn init_line_states(chart_raw: chart::ChartRaw) -> Metadata {
                         ..Default::default()
                     })
                     .collect(),
-            }
+            });
         }
         states
             .iter_mut()
@@ -91,7 +101,9 @@ pub fn init_line_states(chart_raw: chart::ChartRaw) -> Metadata {
         Metadata {
             length_in_second: get_estimated_length(states),
             offset: chart.offset,
-            format_version,
+            lines: states.len() as u32,
+            format_version: 0,
+            block_areas: 0,
         }
     });
     states::statistics::init_flatten_line_state();
@@ -116,17 +128,26 @@ pub fn recalculate_floor_position() {
     });
 }
 
+/// Initialize world rect from width and height, then update block areas
+pub fn init_world_rect_with_block_area_update(chart: &chart::Chart, width: f64, height: f64) {
+    let new_world_rect = Rect::centered(width, height);
+    init_world_rect(width, height);
+    block_area::init_block_area(chart, &new_world_rect);
+}
+
 /// Initialize world rect from width and height
 pub fn init_world_rect(width: f64, height: f64) {
-    WORLD_RECT.with_borrow_mut(|world_height| {
-        *world_height = Rect::centered(width, height);
+    let new_world_rect = Rect::centered(width, height);
+    WORLD_RECT.with_borrow_mut(move |world_rect| {
+        *world_rect = new_world_rect;
     });
 }
 
 /// Clear the states of lines
 pub fn clear_states() {
     FLATTEN_NOTE_INDEX.with_borrow_mut(std::vec::Vec::clear);
-    LINE_STATES.with_borrow_mut(|it| *it = std::array::from_fn(|_| LineData::default()));
+    LINE_STATES.with_borrow_mut(std::vec::Vec::clear);
+    BLOCK_AREA_STATES.with_borrow_mut(std::vec::Vec::clear);
     TOUCH_STATES.with_borrow_mut(|it| *it = std::array::from_fn(|_| TouchInfo::default()));
     HIT_EFFECT_POOL.with_borrow_mut(|it| *it = std::array::from_fn(|_| HitEffect::default()));
     SPLASH_EFFECT_POOL.with_borrow_mut(|it| *it = std::array::from_fn(|_| SplashEffect::default()));
@@ -205,4 +226,277 @@ fn get_estimated_length(state: &[LineData]) -> f64 {
         .fold(last, |l, i| i.max(l))
     });
     note_max_time.max(event_max_time)
+}
+
+pub mod block_area {
+    use geo::{Coord, MapCoords, Polygon};
+
+    use crate::{
+        BLOCK_AREA_STATES,
+        chart::{
+            self, BlockArea, BlockAreaMoveEvent, BlockAreaPosition, BlockAreaRotateEvent,
+            BlockAreaScaleEvent, BlockAreaTrait,
+        },
+        math,
+        states::block_area::{BlockAreaData, EaseType, Transform},
+    };
+
+    struct Sample {
+        position: BlockAreaPosition,
+        rotate_anchor: BlockAreaPosition,
+        rotate: f64,
+        scale_anchor: BlockAreaPosition,
+        scale: BlockAreaPosition,
+    }
+
+    // 已完成今日……
+    const SAMPLE_FREQUENCY: u32 = 325;
+
+    /// Initialize the block areas from a chart
+    pub fn init_block_area(chart: &chart::Chart, world_rect: &math::Rect) {
+        let Some(ref block_area_list) = chart.block_area_list else {
+            return;
+        };
+        BLOCK_AREA_STATES.with_borrow_mut(|data_sink| {
+            data_sink.clear();
+            for block_area in block_area_list {
+                let mut data = BlockAreaData::default();
+                data.state.enable = true;
+                data.appear_time = block_area.appear_time;
+                data.enable_time = block_area.enable_time;
+                data.disable_time = block_area.disable_time;
+                data.disappear_time = block_area.disappear_time;
+                data.is_subtract = block_area.is_subtract;
+                let duration = block_area.disappear_time - block_area.appear_time;
+                let sample_step = duration / f64::from(SAMPLE_FREQUENCY);
+                let init_polygon = get_init_polygon(block_area, world_rect);
+                for sample_i in 0..SAMPLE_FREQUENCY {
+                    let time = f64::from(sample_i).mul_add(sample_step, block_area.appear_time);
+                    let sample = take_sample(block_area, time);
+                    let polygon = apply_transform(block_area, &init_polygon, &sample, world_rect);
+                    data.events.push((time, polygon));
+                }
+                data_sink.push(data);
+            }
+        });
+    }
+
+    fn get_init_polygon(block_area: &BlockArea, world_rect: &math::Rect) -> Polygon {
+        let top_right = &block_area.top_right_percentage;
+        let bottom_left = &block_area.bottom_left_percentage;
+        let exterior = vec![
+            (
+                top_right.x * world_rect.width,
+                top_right.y * world_rect.height,
+            ),
+            (
+                bottom_left.x * world_rect.width,
+                top_right.y * world_rect.height,
+            ),
+            (
+                bottom_left.x * world_rect.width,
+                bottom_left.y * world_rect.height,
+            ),
+            (
+                top_right.x * world_rect.width,
+                bottom_left.y * world_rect.height,
+            ),
+            (
+                top_right.x * world_rect.width,
+                top_right.y * world_rect.height,
+            ),
+        ];
+        Polygon::new(exterior.into(), vec![])
+    }
+
+    fn apply_transform(
+        block_area: &BlockArea,
+        polygon: &Polygon,
+        sample: &Sample,
+        world_rect: &math::Rect,
+    ) -> Polygon {
+        let Sample {
+            position,
+            rotate_anchor,
+            rotate,
+            scale_anchor,
+            scale,
+        } = sample;
+        let top_right = &block_area.top_right_percentage;
+        let bottom_left = &block_area.bottom_left_percentage;
+        let origin = Coord {
+            x: f64::midpoint(top_right.x, bottom_left.x) * world_rect.width,
+            y: f64::midpoint(top_right.y, bottom_left.y) * world_rect.height,
+        };
+        let center = Coord {
+            x: 0.5 * world_rect.width,
+            y: 0.5 * world_rect.height,
+        };
+        polygon.map_coords(|coord| {
+            coord
+                .translate(&-origin)
+                .translate(&center)
+                .scale(&scale_anchor.to_coord(world_rect), scale.x, scale.y)
+                .rotate(&rotate_anchor.to_coord(world_rect), *rotate)
+                .translate(&-center)
+                .translate(&position.to_coord(world_rect))
+        })
+    }
+
+    fn take_sample(block_area: &BlockArea, time: f64) -> Sample {
+        let move_frame = get_key_frame(&block_area.move_events, time);
+        let rotate_frame = get_key_frame(&block_area.rotate_events, time);
+        let scale_frame = get_key_frame(&block_area.scale_events, time);
+        let initial_center = BlockAreaPosition {
+            x: f64::midpoint(
+                block_area.top_right_percentage.x,
+                block_area.bottom_left_percentage.x,
+            ),
+            y: f64::midpoint(
+                block_area.top_right_percentage.y,
+                block_area.bottom_left_percentage.y,
+            ),
+        };
+        let position = get_position(move_frame, &initial_center, time);
+        let (rotate_anchor, rotate) = get_rotate(rotate_frame, time);
+        let (scale_anchor, scale) = get_scale(scale_frame, time);
+        Sample {
+            position,
+            rotate_anchor,
+            rotate,
+            scale_anchor,
+            scale,
+        }
+    }
+
+    fn get_position(
+        move_frame: Option<(&BlockAreaMoveEvent, Option<&BlockAreaMoveEvent>)>,
+        initial_center: &BlockAreaPosition,
+        time: f64,
+    ) -> BlockAreaPosition {
+        move_frame.map_or_else(
+            || initial_center.clone(),
+            |(this, option_next)| {
+                let duration = get_frame_duration(this, option_next);
+                let duration_percent = if duration == 0.0 {
+                    1.0
+                } else {
+                    (time - this.time()) / duration
+                };
+                let this_position = &this.end_position;
+                let ease_type_x =
+                    EaseType::try_from(this.ease_type_x).expect("illegal ease type_x");
+                let ease_type_y =
+                    EaseType::try_from(this.ease_type_y).expect("illegal ease type_y");
+                option_next.map_or_else(
+                    || this_position.clone(),
+                    |next| {
+                        let next_position = &next.end_position;
+                        BlockAreaPosition {
+                            x: ease_type_x
+                                .ease(duration_percent)
+                                .mul_add(next_position.x - this_position.x, this_position.x),
+                            y: ease_type_y
+                                .ease(duration_percent)
+                                .mul_add(next_position.y - this_position.y, this_position.y),
+                        }
+                    },
+                )
+            },
+        )
+    }
+
+    fn get_rotate(
+        rotate_frame: Option<(&BlockAreaRotateEvent, Option<&BlockAreaRotateEvent>)>,
+        time: f64,
+    ) -> (BlockAreaPosition, f64) {
+        rotate_frame.map_or_else(
+            || (BlockAreaPosition::default(), 0.0),
+            |(this, option_next)| {
+                let duration = get_frame_duration(this, option_next);
+                let duration_percent = if duration == 0.0 {
+                    1.0
+                } else {
+                    (time - this.time()) / duration
+                };
+                let this_rotate = this.rotation;
+                let ease_type = EaseType::try_from(this.ease_type).expect("illegal ease type");
+                option_next.map_or_else(
+                    || (this.anchor.clone(), this_rotate),
+                    |next| {
+                        let next_rotate = next.rotation;
+                        (
+                            this.anchor.clone(),
+                            ease_type
+                                .ease(duration_percent)
+                                .mul_add(next_rotate - this_rotate, this_rotate),
+                        )
+                    },
+                )
+            },
+        )
+    }
+
+    fn get_scale(
+        scale_frame: Option<(&BlockAreaScaleEvent, Option<&BlockAreaScaleEvent>)>,
+        time: f64,
+    ) -> (BlockAreaPosition, BlockAreaPosition) {
+        scale_frame.map_or_else(
+            || {
+                (
+                    BlockAreaPosition { x: 0.5, y: 0.5 },
+                    BlockAreaPosition { x: 1.0, y: 1.0 },
+                )
+            },
+            |(this, option_next)| {
+                let duration = get_frame_duration(this, option_next);
+                let duration_percent = if duration == 0.0 {
+                    1.0
+                } else {
+                    (time - this.time()) / duration
+                };
+                let this_scale = &this.scale;
+                let ease_type_x =
+                    EaseType::try_from(this.ease_type_x).expect("illegal ease type_x");
+                let ease_type_y =
+                    EaseType::try_from(this.ease_type_y).expect("illegal ease type_y");
+                option_next.map_or_else(
+                    || (this.anchor.clone(), this_scale.clone()),
+                    |next| {
+                        let next_scale = &next.scale;
+                        (
+                            this.anchor.clone(),
+                            BlockAreaPosition {
+                                x: ease_type_x
+                                    .ease(duration_percent)
+                                    .mul_add(next_scale.x - this_scale.x, this_scale.x),
+                                y: ease_type_y
+                                    .ease(duration_percent)
+                                    .mul_add(next_scale.y - this_scale.y, this_scale.y),
+                            },
+                        )
+                    },
+                )
+            },
+        )
+    }
+
+    fn get_frame_duration<T>(this: &T, option_next: Option<&T>) -> f64
+    where
+        T: BlockAreaTrait,
+    {
+        option_next.map_or_else(|| this.time(), BlockAreaTrait::time) - this.time()
+    }
+
+    fn get_key_frame<T>(events: &[T], time: f64) -> Option<(&T, Option<&T>)>
+    where
+        T: BlockAreaTrait + Clone,
+    {
+        events
+            .iter()
+            .enumerate()
+            .rev()
+            .find(|(_, it)| it.time() <= time)
+            .map(|(i, this)| (this, events.get(i + 1)))
+    }
 }

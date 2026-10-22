@@ -1,3 +1,4 @@
+pub mod block_area;
 pub mod effect;
 pub mod initializing;
 pub mod input;
@@ -12,6 +13,7 @@ use serde::Serialize;
 use crate::{
     LINE_STATES, WORLD_RECT,
     chart::{self},
+    states::block_area::tick_block_areas,
 };
 
 #[derive(Default)]
@@ -104,6 +106,12 @@ pub struct Metadata {
 
     /// The format version of the chart
     pub format_version: i32,
+
+    /// The count of lines
+    pub lines: u32,
+
+    /// The count of block areas
+    pub block_areas: u32,
 }
 
 impl Default for NoteState {
@@ -163,6 +171,7 @@ pub fn tick_all(time_in_second: f64, delta_time_in_second: f64, auto: bool) {
     WORLD_RECT.with_borrow(|world_rect| {
         lines::tick_lines(time_in_second, world_rect);
         effect::tick_effect(delta_time_in_second);
+        tick_block_areas(time_in_second);
         if judge::tick_lines_judge(delta_time_in_second, auto, world_rect) {
             statistics::refresh_chart_statistics();
         }

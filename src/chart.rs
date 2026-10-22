@@ -1,5 +1,7 @@
 use serde::Deserialize;
 
+use crate::math;
+
 /// The raw chart format
 #[derive(Clone)]
 pub enum ChartRaw {
@@ -22,6 +24,14 @@ pub struct Chart {
     /// The list of the judge lines
     #[serde(rename = "judgeLineList")]
     pub judge_line_list: Vec<JudgeLine>,
+
+    /// The list of the block area
+    #[serde(rename = "blockAreaList")]
+    pub block_area_list: Option<Vec<BlockArea>>,
+
+    /// The format version
+    #[serde(skip_deserializing)]
+    pub format_version: i32,
 }
 
 #[derive(Deserialize, Clone)]
@@ -30,6 +40,8 @@ pub struct ChartV1 {
     pub offset: f64,
     #[serde(rename = "judgeLineList")]
     pub judge_line_list: Vec<JudgeLineV1>,
+    #[serde(rename = "blockAreaList")]
+    pub block_area_list: Option<Vec<BlockArea>>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -156,6 +168,98 @@ pub struct Event4 {
     pub end2: f64,
 }
 
+#[derive(Deserialize, Clone, Default)]
+pub struct BlockArea {
+    #[serde(rename = "topRightPercentage")]
+    pub top_right_percentage: BlockAreaPosition,
+    #[serde(rename = "bottomLeftPercentage")]
+    pub bottom_left_percentage: BlockAreaPosition,
+    #[serde(rename = "appearTime")]
+    pub appear_time: f64,
+    #[serde(rename = "enableTime")]
+    pub enable_time: f64,
+    #[serde(rename = "disableTime")]
+    pub disable_time: f64,
+    #[serde(rename = "disappearTime")]
+    pub disappear_time: f64,
+    #[serde(rename = "isSubtract")]
+    pub is_subtract: bool,
+    #[serde(rename = "rotateEvents")]
+    pub rotate_events: Vec<BlockAreaRotateEvent>,
+    #[serde(rename = "moveEvents")]
+    pub move_events: Vec<BlockAreaMoveEvent>,
+    #[serde(rename = "scaleEvents")]
+    pub scale_events: Vec<BlockAreaScaleEvent>,
+}
+
+#[derive(Deserialize, Clone, Default)]
+pub struct BlockAreaPosition {
+    pub x: f64,
+    pub y: f64,
+}
+
+impl BlockAreaPosition {
+    pub fn to_coord(&self, world_rect: &math::Rect) -> geo::Coord {
+        geo::Coord {
+            x: self.x * world_rect.width,
+            y: self.y * world_rect.height,
+        }
+    }
+}
+
+#[derive(Deserialize, Clone)]
+pub struct BlockAreaRotateEvent {
+    pub anchor: BlockAreaPosition,
+    pub time: f64,
+    #[serde(rename = "easeType")]
+    pub ease_type: u32,
+    pub rotation: f64,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct BlockAreaMoveEvent {
+    #[serde(rename = "endPosition")]
+    pub end_position: BlockAreaPosition,
+    pub time: f64,
+    #[serde(rename = "easeTypeX")]
+    pub ease_type_x: u32,
+    #[serde(rename = "easeTypeY")]
+    pub ease_type_y: u32,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct BlockAreaScaleEvent {
+    pub anchor: BlockAreaPosition,
+    pub time: f64,
+    #[serde(rename = "easeTypeX")]
+    pub ease_type_x: u32,
+    #[serde(rename = "easeTypeY")]
+    pub ease_type_y: u32,
+    pub scale: BlockAreaPosition,
+}
+
+pub trait BlockAreaTrait {
+    fn time(&self) -> f64;
+}
+
+impl BlockAreaTrait for BlockAreaMoveEvent {
+    fn time(&self) -> f64 {
+        self.time
+    }
+}
+
+impl BlockAreaTrait for BlockAreaScaleEvent {
+    fn time(&self) -> f64 {
+        self.time
+    }
+}
+
+impl BlockAreaTrait for BlockAreaRotateEvent {
+    fn time(&self) -> f64 {
+        self.time
+    }
+}
+
 pub trait WithValue<T> {
     fn get_value(&self) -> (T, T);
     fn zero() -> (T, T);
@@ -273,8 +377,13 @@ impl ChartRaw {
                     .into_iter()
                     .map(std::convert::Into::into)
                     .collect(),
+                block_area_list: v1.block_area_list,
+                format_version: 1,
             },
-            Self::V3(v3) => v3,
+            Self::V3(v3) => Chart {
+                format_version: 3,
+                ..v3
+            },
         }
     }
 }

@@ -25,9 +25,10 @@ mod states;
 
 thread_local! {
     pub(crate) static DRAW_IMAGE_OFFSET:RefCell<draw::DrawImageOffset> = RefCell::new(draw::DrawImageOffset::default());
-    pub(crate) static FLATTEN_NOTE_INDEX:RefCell<Vec<states::statistics::NoteIndex>>= const{RefCell::new(Vec::<_>::new())};
-    pub(crate) static LINE_STATES: RefCell<[states::LineData;50]> = RefCell::new(std::array::from_fn(|_|states::LineData::default()));
+    pub(crate) static FLATTEN_NOTE_INDEX:RefCell<Vec<states::statistics::NoteIndex>>= const { RefCell::new(Vec::<_>::new()) };
+    pub(crate) static LINE_STATES: RefCell<Vec<states::LineData>> = const { RefCell::new(Vec::<_>::new()) };
     pub(crate) static TOUCH_STATES: RefCell<[input::TouchInfo; 30]> = RefCell::new(std::array::from_fn(|_|input::TouchInfo::default()));
+    pub(crate) static BLOCK_AREA_STATES: RefCell<Vec<states::block_area::BlockAreaData>> = const { RefCell::new(Vec::new()) };
     pub(crate) static HIT_EFFECT_POOL: RefCell<[states::effect::HitEffect; 64]> = RefCell::new(std::array::from_fn(|_|states::effect::HitEffect::default()));
     pub(crate) static SPLASH_EFFECT_POOL : RefCell<[states::effect::SplashEffect;256]> = RefCell::new(std::array::from_fn(|_|states::effect::SplashEffect::default()));
     pub(crate) static CHART_STATISTICS: RefCell<states::statistics::ChartStatistics> = RefCell::new(states::statistics::ChartStatistics::default());
@@ -45,8 +46,10 @@ pub use draw::process_state_to_drawable;
 
 pub use states::initializing::clear_states;
 pub use states::initializing::init_line_states;
-pub use states::initializing::init_line_states_from_json;
+pub use states::initializing::init_states;
 pub use states::initializing::init_world_rect;
+pub use states::initializing::init_world_rect_with_block_area_update;
+pub use states::initializing::parse_chart_json;
 pub use states::initializing::recalculate_floor_position;
 
 pub use states::input::clear_touch;
