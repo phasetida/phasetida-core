@@ -3,8 +3,7 @@
 //! Thank you!
 
 use geo::{
-    Coord, Distance, Euclidean, EuclideanDistance, LineString, LinesIter, Polygon,
-    line_measures::LengthMeasurable,
+    Coord, Distance, Euclidean, LineString, LinesIter, Polygon, line_measures::LengthMeasurable,
 };
 use num_enum::TryFromPrimitive;
 

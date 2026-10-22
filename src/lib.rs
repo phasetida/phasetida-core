@@ -45,12 +45,12 @@ pub use draw::load_image_offset;
 pub use draw::process_state_to_drawable;
 
 pub use states::initializing::clear_states;
-pub use states::initializing::init_line_states;
 pub use states::initializing::init_states;
 pub use states::initializing::init_world_rect;
 pub use states::initializing::init_world_rect_with_block_area_update;
+pub use states::initializing::lines::init_line_states;
+pub use states::initializing::lines::recalculate_floor_position;
 pub use states::initializing::parse_chart_json;
-pub use states::initializing::recalculate_floor_position;
 
 pub use states::input::clear_touch;
 pub use states::input::set_touch_down;
